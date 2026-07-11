@@ -16,6 +16,14 @@ if (!HTMLElement.prototype.scrollIntoView) {
     HTMLElement.prototype.scrollIntoView = () => undefined
 }
 
+if (typeof globalThis.ResizeObserver === "undefined") {
+    globalThis.ResizeObserver = class ResizeObserver {
+        observe(): void {}
+        unobserve(): void {}
+        disconnect(): void {}
+    }
+}
+
 const originalGetBoundingClientRect =
     HTMLElement.prototype.getBoundingClientRect
 
