@@ -7,16 +7,26 @@ interface TaskFormPanelProps {
   onCancel: () => void;
   onSave: () => void;
   onDelete: () => void;
+  isSubmitting?: boolean;
+  isDeleting?: boolean;
 }
 
-export function TaskFormPanel({ formState, onChange, onCancel, onSave, onDelete }: TaskFormPanelProps) {
+export function TaskFormPanel({
+  formState,
+  onChange,
+  onCancel,
+  onSave,
+  onDelete,
+  isSubmitting = false,
+  isDeleting = false,
+}: TaskFormPanelProps) {
   const title = formState.mode === 'editing' ? '작업 수정' : '작업 생성';
 
   return (
     <div
       className="task-panel-backdrop"
       onMouseDown={event => {
-        if (event.target === event.currentTarget) {
+        if (!isSubmitting && event.target === event.currentTarget) {
           onCancel();
         }
       }}
@@ -26,14 +36,19 @@ export function TaskFormPanel({ formState, onChange, onCancel, onSave, onDelete 
         className="task-panel"
         role="dialog"
         onKeyDown={event => {
-          if (event.key === 'Escape') {
+          if (!isSubmitting && event.key === 'Escape') {
             onCancel();
           }
         }}
       >
         <div className="task-panel-header">
           <h2>{title}</h2>
-          <button type="button" aria-label="닫기" onClick={onCancel}>
+          <button
+            type="button"
+            aria-label="닫기"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
             닫기
           </button>
         </div>
@@ -44,6 +59,7 @@ export function TaskFormPanel({ formState, onChange, onCancel, onSave, onDelete 
             aria-label="제목"
             value={formState.draft.title}
             onChange={event => onChange({ title: event.target.value })}
+            disabled={isSubmitting}
           />
         </label>
 
@@ -53,6 +69,7 @@ export function TaskFormPanel({ formState, onChange, onCancel, onSave, onDelete 
             aria-label="설명"
             value={formState.draft.description}
             onChange={event => onChange({ description: event.target.value })}
+            disabled={isSubmitting}
           />
         </label>
 
@@ -62,6 +79,7 @@ export function TaskFormPanel({ formState, onChange, onCancel, onSave, onDelete 
             aria-label="우선순위"
             value={formState.draft.priority}
             onChange={event => onChange({ priority: event.target.value as Priority })}
+            disabled={isSubmitting}
           >
             <option value="high">High</option>
             <option value="medium">Medium</option>
@@ -75,6 +93,7 @@ export function TaskFormPanel({ formState, onChange, onCancel, onSave, onDelete 
             aria-label="상태"
             value={formState.draft.status}
             onChange={event => onChange({ status: event.target.value as Status })}
+            disabled={isSubmitting}
           >
             <option value="todo">To Do</option>
             <option value="in-progress">In Progress</option>
@@ -90,19 +109,28 @@ export function TaskFormPanel({ formState, onChange, onCancel, onSave, onDelete 
 
         <div className="task-panel-actions">
           {formState.mode === 'editing' ? (
-            <button type="button" className="danger-button" onClick={onDelete}>
-              삭제
+            <button
+              type="button"
+              className="danger-button"
+              onClick={onDelete}
+              disabled={isSubmitting}
+            >
+              {isDeleting ? '삭제 중...' : '삭제'}
             </button>
           ) : null}
-          <button type="button" onClick={onCancel}>
+          <button type="button" onClick={onCancel} disabled={isSubmitting}>
             취소
           </button>
-          <button type="button" className="primary-button" onClick={onSave}>
-            저장
+          <button
+            type="button"
+            className="primary-button"
+            onClick={onSave}
+            disabled={isSubmitting}
+          >
+            {isSubmitting && !isDeleting ? '저장 중...' : '저장'}
           </button>
         </div>
       </aside>
     </div>
   );
 }
-

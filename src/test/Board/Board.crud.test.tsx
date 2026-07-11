@@ -272,4 +272,99 @@ describe('보드 task form CRUD', () => {
     expect(getRequestCount).toBe(1);
     expect(screen.queryByRole('dialog', { name: '작업 생성' })).not.toBeInTheDocument();
   });
+
+  it('생성 요청이 처리 중이면 저장 반복 클릭이 POST 요청을 중복 전송하지 않는다', async () => {
+    const createResponse = createDeferred<Response>();
+    const postRequests: Array<Partial<Task>> = [];
+
+    server.use(
+      http.get('*/api/tasks', () => HttpResponse.json([])),
+      http.post('*/api/tasks', async ({ request }) => {
+        postRequests.push((await request.json()) as Partial<Task>);
+        return createResponse.promise;
+      })
+    );
+
+    renderBoard();
+
+    await screen.findByText('표시할 작업이 없습니다.');
+    fireEvent.click(screen.getByRole('button', { name: '작업 만들기' }));
+    fillTaskForm({
+      title: '중복 생성 방지 작업',
+      description: '첫 요청이 끝나기 전 다시 저장한다',
+      priority: 'high',
+      status: 'todo',
+    });
+
+    const saveButton = screen.getByRole('button', { name: '저장' });
+    fireEvent.click(saveButton);
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(postRequests).toHaveLength(1));
+  });
+
+  it('수정 요청이 처리 중이면 저장 반복 클릭이 PATCH 요청을 중복 전송하지 않는다', async () => {
+    const task = makeTask({
+      title: '수정 중복 방지 대상',
+      status: 'todo',
+      version: 5,
+    });
+    const updateResponse = createDeferred<Response>();
+    const patchRequests: Array<Partial<Task> & { version?: number }> = [];
+
+    server.use(
+      http.get('*/api/tasks', () => HttpResponse.json([task])),
+      http.patch('*/api/tasks/:id', async ({ request }) => {
+        patchRequests.push(
+          (await request.json()) as Partial<Task> & { version?: number }
+        );
+        return updateResponse.promise;
+      })
+    );
+
+    renderBoard();
+
+    await screen.findByText(task.title);
+    openEditor(task);
+    fillTaskForm({ title: '수정 요청 1회만 전송' });
+
+    const saveButton = screen.getByRole('button', { name: '저장' });
+    fireEvent.click(saveButton);
+    fireEvent.click(saveButton);
+
+    await waitFor(() => expect(patchRequests).toHaveLength(1));
+    expect(patchRequests[0]).toEqual(
+      expect.objectContaining({
+        title: '수정 요청 1회만 전송',
+        version: task.version,
+      })
+    );
+  });
+
+  it('삭제 요청이 처리 중이면 삭제 반복 클릭이 confirm과 DELETE를 중복 실행하지 않는다', async () => {
+    const task = makeTask({ title: '삭제 중복 방지 대상', status: 'todo' });
+    const deleteResponse = createDeferred<Response>();
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const deleteRequests: string[] = [];
+
+    server.use(
+      http.get('*/api/tasks', () => HttpResponse.json([task])),
+      http.delete('*/api/tasks/:id', ({ params }) => {
+        deleteRequests.push(params.id as string);
+        return deleteResponse.promise;
+      })
+    );
+
+    renderBoard();
+
+    await screen.findByText(task.title);
+    openEditor(task);
+
+    const deleteButton = screen.getByRole('button', { name: '삭제' });
+    fireEvent.click(deleteButton);
+    fireEvent.click(deleteButton);
+
+    await waitFor(() => expect(deleteRequests).toEqual([task.id]));
+    expect(confirmSpy).toHaveBeenCalledTimes(1);
+  });
 });
