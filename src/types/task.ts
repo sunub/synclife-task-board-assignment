@@ -39,6 +39,7 @@ export type MoveTaskVariables = {
     id: string
     status: Status
     version: number
+    rebased?: boolean
 }
 
 export type MoveTaskContext = {
