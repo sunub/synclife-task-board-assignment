@@ -10,6 +10,61 @@ import { normalizeTasks } from "@/lib/tasks"
 import { makeTask as makeTaskFixture } from "@/test/utils"
 import type { Status, Task } from "@/types/task"
 
+type DragEndHandler = (event: {
+    canceled: boolean
+    operation: {
+        source: { id: string } | null
+        target: { id: string } | null
+    }
+}) => void
+
+let activeDragId: string | null = null
+let dragEndHandler: DragEndHandler | undefined
+
+vi.mock("@dnd-kit/react", () => ({
+    DragDropProvider: ({
+        children,
+        onDragEnd,
+    }: {
+        children: React.ReactNode
+        onDragEnd?: DragEndHandler
+    }) => {
+        dragEndHandler = onDragEnd
+        return children
+    },
+    useDraggable: ({ id, disabled }: { id: string; disabled?: boolean }) => ({
+        ref: (element: HTMLElement | null) => {
+            if (!element || disabled) {
+                return
+            }
+
+            element.draggable = true
+            element.ondragstart = () => {
+                activeDragId = id
+            }
+        },
+    }),
+    useDroppable: ({ id, disabled }: { id: string; disabled?: boolean }) => ({
+        isDropTarget: false,
+        ref: (element: HTMLElement | null) => {
+            if (!element || disabled) {
+                return
+            }
+
+            element.ondrop = () => {
+                dragEndHandler?.({
+                    canceled: false,
+                    operation: {
+                        source: activeDragId ? { id: activeDragId } : null,
+                        target: { id },
+                    },
+                })
+                activeDragId = null
+            }
+        },
+    }),
+}))
+
 export const scrollToIndexMock = vi.fn()
 export const scrollToOffsetMock = vi.fn()
 
