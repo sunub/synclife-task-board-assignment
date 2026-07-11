@@ -5,6 +5,7 @@ import {
   getCardClassName,
   getPriorityLabel,
 } from './utils';
+import { useDraggable } from '@dnd-kit/react';
 
 interface CardProps {
   task: Task;
@@ -12,19 +13,17 @@ interface CardProps {
   onEdit?: (task: Task) => void;
 }
 
-export function Card({ task, dragDisabled = false, onEdit = () => {} }: CardProps) {
+export function Card({ task, dragDisabled = false, onEdit = () => { } }: CardProps) {
+  const { ref } = useDraggable({
+    id: task.id,
+    disabled: dragDisabled,
+  });
+
   return (
     <article
+      ref={ref}
       aria-label={task.title}
       className={getCardClassName(task.priority)}
-      draggable={!dragDisabled}
-      onDragStart={event => {
-        if (dragDisabled) {
-          event.preventDefault();
-          return;
-        }
-        event.dataTransfer.setData('text/plain', task.id);
-      }}
     >
       <div className="card-header">
         <div className="card-title">{task.title}</div>

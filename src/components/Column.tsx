@@ -3,13 +3,13 @@ import type { Task, Status } from '../types/task';
 import { Card } from './Card';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { estimateCardHeight } from './utils';
+import { useDroppable } from '@dnd-kit/react';
 
 interface Props {
   title: string;
   status: Status;
   taskIds: string[];
   taskById: Record<string, Task>;
-  onMove: (id: string, status: Status) => void;
   onEditTask?: (task: Task) => void;
   dragDisabled?: boolean;
   scrollToTaskId?: string;
@@ -21,8 +21,7 @@ export function Column({
   status,
   taskIds,
   taskById,
-  onMove,
-  onEditTask = () => {},
+  onEditTask = () => { },
   dragDisabled = false,
   scrollToTaskId,
   scrollToTopVersion = 0,
@@ -32,10 +31,18 @@ export function Column({
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const [cardWidth, setCardWidth] = useState(300);
   const titleId = `column-${status}-title`;
+  const { ref: setDroppableRef, isDropTarget } = useDroppable({
+    id: status,
+    disabled: dragDisabled,
+  });
   const setColumnBodyRef = useCallback((element: HTMLDivElement | null) => {
     parentRef.current = element;
     setScrollElement(current => (current === element ? current : element));
   }, []);
+
+  const setColumnRef = useCallback((element: HTMLElement | null) => {
+    setDroppableRef(element);
+  }, [setDroppableRef]);
 
   useEffect(() => {
     if (!scrollElement) {
@@ -116,20 +123,9 @@ export function Column({
 
   return (
     <section
+      ref={setColumnRef}
       aria-labelledby={titleId}
-      className="column"
-      onDragOver={e => {
-        if (!dragDisabled) {
-          e.preventDefault();
-        }
-      }}
-      onDrop={e => {
-        if (dragDisabled) {
-          return;
-        }
-        const id = e.dataTransfer.getData('text/plain');
-        if (id) onMove(id, status);
-      }}
+      className={isDropTarget ? 'column is-drop-target' : 'column'}
     >
       <h2 className="column-title" id={titleId}>
         {title} <span className="count">{taskIds.length}</span>
