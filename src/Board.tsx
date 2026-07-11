@@ -1,54 +1,239 @@
-import { useEffect, useMemo, useState } from 'react'
-import type { Task, Status } from './types'
-import { getTasks } from './api/client'
-import { Column } from './components/Column'
+import { useMemo, useRef, useState } from "react";
+import {
+  useMutation,
+  useQueryClient,
+  useSuspenseQuery,
+} from "@tanstack/react-query";
+import type { Status, Task } from "./types/task";
+import {
+  getConflictCurrentTaskFromPayload,
+  type MoveTaskContext,
+  type MoveTaskVariables,
+  type TaskColumn,
+} from "./types/task";
+import { ApiError, updateTask } from "./api/client";
+import { defaultTaskQueryOptions } from "./api/query";
+import { Column } from "./components/Column";
+import {
+  applyServerTask,
+  moveTaskOptimistically,
+  selectVisibleTaskIdsByStatus,
+  type TaskBoardModel,
+  type TaskSortKey,
+  type TaskSortOptions,
+} from "./lib/tasks";
+import { toast, Toaster } from "sonner";
+import { EdittingProvider } from "./provider/EdittingProvider";
 
-const COLUMNS: { status: Status; title: string }[] = [
-  { status: 'todo', title: 'To Do' },
-  { status: 'in-progress', title: 'In Progress' },
-  { status: 'done', title: 'Done' },
-]
+const COLUMNS: TaskColumn[] = [
+  { status: "todo", title: "To Do" },
+  { status: "in-progress", title: "In Progress" },
+  { status: "done", title: "Done" },
+];
 
-export default function Board() {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [loading, setLoading] = useState(true)
+const SORT_OPTIONS: Record<TaskSortKey, TaskSortOptions> = {
+  title: { sortBy: "title", direction: "asc" },
+  priority: { sortBy: "priority", direction: "desc" },
+  createdAt: { sortBy: "createdAt", direction: "asc" },
+  updatedAt: { sortBy: "updatedAt", direction: "desc" },
+};
 
-  useEffect(() => {
-    // 순진한 초기 로드: 로딩만 처리합니다.
-    // TODO(P1): 에러 상태 + 재시도, 빈 상태 처리를 구현하세요.
-    getTasks()
-      .then((data) => setTasks(data))
-      .finally(() => setLoading(false))
-  }, [])
-
-  // ⚠️ 서버에 저장하지 않고 로컬 상태만 바꾸는 "순진한" 이동입니다.
-  // TODO(P1): 낙관적 업데이트 + 실패 시 롤백 + 경쟁 상태 처리를 구현하세요.
-  //   - updateTask(id, { status, version }) 로 서버에 반영
-  //   - 실패(15%)하면 이전 상태로 되돌리고 사용자에게 알림
-  //   - 같은 카드를 빠르게 연속 이동해도 최종 상태가 서버와 일치하도록
-  const moveTask = (id: string, status: Status) => {
-    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, status } : t)))
+function getConflictCurrentTask(error: unknown): Task | null {
+  if (!(error instanceof ApiError) || error.status !== 409) {
+    return null;
   }
 
-  const byStatus = useMemo(() => {
-    const map: Record<Status, Task[]> = { todo: [], 'in-progress': [], done: [] }
-    for (const t of tasks) map[t.status].push(t)
-    return map
-  }, [tasks])
+  return getConflictCurrentTaskFromPayload(error.payload);
+}
 
-  if (loading) return <p className="hint">불러오는 중…</p>
+export default function Board() {
+  const queryClient = useQueryClient();
+  const { data: boardModel } = useSuspenseQuery(defaultTaskQueryOptions);
+  const latestMoveSequenceByTaskId = useRef(new Map<string, number>());
+  const [searchText, setSearchText] = useState("");
+  const [sortBy, setSortBy] = useState<TaskSortKey>("updatedAt");
+  const [scrollToTopVersion, setScrollToTopVersion] = useState(0);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [scrollTargetByStatus, setScrollTargetByStatus] = useState<
+    Partial<Record<Status, string>>
+  >({});
+  const sortOptions = SORT_OPTIONS[sortBy];
+  const moveTaskMutation = useMutation<
+    Task,
+    unknown,
+    MoveTaskVariables,
+    MoveTaskContext
+  >({
+    mutationFn: ({ id, status, version }) =>
+      updateTask(id, { status, version }),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({
+        queryKey: defaultTaskQueryOptions.queryKey,
+      });
+
+      const currentModel =
+        queryClient.getQueryData<TaskBoardModel>(
+          defaultTaskQueryOptions.queryKey,
+        ) ?? boardModel;
+      const previousTask = currentModel.byId[id];
+      const sequence = (latestMoveSequenceByTaskId.current.get(id) ?? 0) + 1;
+      latestMoveSequenceByTaskId.current.set(id, sequence);
+      const updatedAt = new Date().toISOString();
+
+      queryClient.setQueryData<TaskBoardModel>(
+        defaultTaskQueryOptions.queryKey,
+        (old) =>
+          old
+            ? moveTaskOptimistically(old, id, status, updatedAt, sortOptions)
+            : old,
+      );
+
+      return {
+        taskId: id,
+        sequence,
+        previousTask,
+      };
+    },
+    onSuccess: (updatedTask, _variables, context) => {
+      if (
+        latestMoveSequenceByTaskId.current.get(context.taskId) !==
+        context.sequence
+      ) {
+        return;
+      }
+
+      queryClient.setQueryData<TaskBoardModel>(
+        defaultTaskQueryOptions.queryKey,
+        (old) => (old ? applyServerTask(old, updatedTask, sortOptions) : old),
+      );
+      setScrollTargetByStatus((previous) => ({
+        ...previous,
+        [updatedTask.status]: updatedTask.id,
+      }));
+    },
+    onError: (error, _variables, context) => {
+      if (!context) {
+        return;
+      }
+      if (
+        latestMoveSequenceByTaskId.current.get(context.taskId) !==
+        context.sequence
+      ) {
+        return;
+      }
+
+      const currentTask = getConflictCurrentTask(error);
+
+      if (currentTask) {
+        queryClient.setQueryData<TaskBoardModel>(
+          defaultTaskQueryOptions.queryKey,
+          (old) => (old ? applyServerTask(old, currentTask, sortOptions) : old),
+        );
+        const message = "다른 변경이 먼저 반영되어 서버 최신 상태로 갱신했습니다.";
+        setStatusMessage(message);
+        toast.error(message);
+        return;
+      }
+
+      queryClient.setQueryData<TaskBoardModel>(
+        defaultTaskQueryOptions.queryKey,
+        (old) =>
+          old ? applyServerTask(old, context.previousTask, sortOptions) : old,
+      );
+      const message = "이동에 실패해 이전 상태로 되돌렸습니다.";
+      setStatusMessage(message);
+      toast.info(message);
+    },
+  });
+
+  const moveTask = (id: string, status: Status) => {
+    const currentModel =
+      queryClient.getQueryData<TaskBoardModel>(
+        defaultTaskQueryOptions.queryKey,
+      ) ?? boardModel;
+    const task = currentModel.byId[id];
+
+    if (!task || task.status === status) {
+      return;
+    }
+
+    moveTaskMutation.mutate({ id, status, version: task.version });
+  };
+
+  const changeSortBy = (nextSortBy: TaskSortKey) => {
+    if (sortBy === nextSortBy) {
+      return;
+    }
+
+    setSortBy(nextSortBy);
+    setScrollToTopVersion((currentVersion) => currentVersion + 1);
+  };
+
+  const changeSearchText = (nextSearchText: string) => {
+    if (searchText === nextSearchText) {
+      return;
+    }
+
+    setSearchText(nextSearchText);
+    setScrollToTopVersion((currentVersion) => currentVersion + 1);
+  };
+
+  const totalTaskCount =
+    boardModel.idsByStatus.todo.length +
+    boardModel.idsByStatus["in-progress"].length +
+    boardModel.idsByStatus.done.length;
+
+  const visibleTaskIdsByStatus = useMemo(
+    () => selectVisibleTaskIdsByStatus(boardModel, { searchText, sortOptions }),
+    [boardModel, searchText, sortOptions],
+  );
+
+  if (totalTaskCount === 0) {
+    return <p className="hint">표시할 작업이 없습니다.</p>;
+  }
 
   return (
-    <div className="board">
-      {COLUMNS.map((col) => (
-        <Column
-          key={col.status}
-          title={col.title}
-          status={col.status}
-          tasks={byStatus[col.status]}
-          onMove={moveTask}
+    <>
+      <Toaster position="top-center" richColors />
+      {statusMessage ? (
+        <p className="sr-only" role="status">
+          {statusMessage}
+        </p>
+      ) : null}
+      <div className="board-toolbar">
+        <input
+          aria-label="작업 검색"
+          type="search"
+          value={searchText}
+          onChange={(event) => changeSearchText(event.target.value)}
         />
-      ))}
-    </div>
-  )
+        <select
+          aria-label="정렬 기준"
+          value={sortBy}
+          onChange={(event) => changeSortBy(event.target.value as TaskSortKey)}
+        >
+          <option value="title">제목 순</option>
+          <option value="priority">우선순위</option>
+          <option value="createdAt">생성 날짜</option>
+          <option value="updatedAt">업데이트 날짜</option>
+        </select>
+      </div>
+      <div className="board">
+        <EdittingProvider>
+          {COLUMNS.map((col) => (
+            <Column
+              key={col.status}
+              title={col.title}
+              status={col.status}
+              taskIds={visibleTaskIdsByStatus[col.status]}
+              taskById={boardModel.byId}
+              onMove={moveTask}
+              scrollToTaskId={scrollTargetByStatus[col.status]}
+              scrollToTopVersion={scrollToTopVersion}
+            />
+          ))}
+        </EdittingProvider>
+      </div>
+    </>
+  );
 }
