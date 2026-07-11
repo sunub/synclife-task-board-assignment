@@ -381,6 +381,187 @@ describe("보드 비동기 이동 처리", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
+  it("이전 이동 요청이 서버에서 먼저 성공한 뒤 최신 이동 요청이 409를 받아도 마지막 이동 의도를 유지한다", async () => {
+    const movingTask = makeTask({ status: "todo", version: 1 });
+    const firstPatch = createDeferred<Response>();
+    const secondPatch = createDeferred<Response>();
+    const thirdPatch = createDeferred<Response>();
+    const patchResponses = [firstPatch, secondPatch, thirdPatch];
+    const patchRequests: Array<Partial<Task> & { version?: number }> = [];
+    const firstServerTask: Task = {
+      ...movingTask,
+      status: "in-progress",
+      updatedAt: new Date(Date.UTC(2026, 0, 2)).toISOString(),
+      version: 2,
+    };
+
+    server.use(
+      http.get("*/api/tasks", () => HttpResponse.json([movingTask])),
+      http.patch("*/api/tasks/:id", async ({ request }) => {
+        const body = (await request.json()) as Partial<Task> & {
+          version?: number;
+        };
+        patchRequests.push(body);
+        const response = patchResponses.shift();
+
+        if (!response) {
+          return HttpResponse.json(
+            { message: "예상하지 못한 요청입니다." },
+            { status: 500 },
+          );
+        }
+
+        return response.promise;
+      }),
+    );
+
+    renderBoard();
+
+    await screen.findByText(movingTask.title);
+
+    dragTaskToColumn(movingTask, "in-progress");
+    dragTaskToColumn(movingTask, "done");
+
+    await waitFor(() =>
+      expect(patchRequests).toEqual([
+        expect.objectContaining({
+          status: "in-progress",
+          version: 1,
+        }),
+        expect.objectContaining({
+          status: "done",
+          version: 1,
+        }),
+      ]),
+    );
+
+    firstPatch.resolve(HttpResponse.json(firstServerTask));
+
+    await waitFor(() => expectTaskInColumn(movingTask, "Done"));
+
+    secondPatch.resolve(
+      HttpResponse.json(
+        {
+          message: "다른 곳에서 먼저 수정되었습니다.",
+          current: firstServerTask,
+        },
+        { status: 409 },
+      ),
+    );
+
+    await waitFor(() =>
+      expect(patchRequests).toEqual([
+        expect.objectContaining({
+          status: "in-progress",
+          version: 1,
+        }),
+        expect.objectContaining({
+          status: "done",
+          version: 1,
+        }),
+        expect.objectContaining({
+          status: "done",
+          version: firstServerTask.version,
+        }),
+      ]),
+    );
+    thirdPatch.resolve(
+      HttpResponse.json({
+        ...movingTask,
+        status: "done",
+        updatedAt: new Date(Date.UTC(2026, 0, 3)).toISOString(),
+        version: 3,
+      }),
+    );
+
+    await waitFor(() => expectTaskInColumn(movingTask, "Done"));
+    expect(
+      within(getColumn("In Progress")).queryByText(movingTask.title),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("최신 이동 요청의 rebase retry도 409를 받으면 서버 최신 작업을 반영하고 안내한다", async () => {
+    const movingTask = makeTask({ status: "todo", version: 1 });
+    const firstConflictCurrentTask: Task = {
+      ...movingTask,
+      status: "in-progress",
+      updatedAt: new Date(Date.UTC(2026, 0, 2)).toISOString(),
+      version: 2,
+    };
+    const secondConflictCurrentTask: Task = {
+      ...movingTask,
+      title: "서버 최종 최신 작업",
+      status: "todo",
+      updatedAt: new Date(Date.UTC(2026, 0, 3)).toISOString(),
+      version: 3,
+    };
+    const patchRequests: Array<Partial<Task> & { version?: number }> = [];
+    const patchResponses = [
+      HttpResponse.json(
+        {
+          message: "다른 곳에서 먼저 수정되었습니다.",
+          current: firstConflictCurrentTask,
+        },
+        { status: 409 },
+      ),
+      HttpResponse.json(
+        {
+          message: "다른 곳에서 먼저 수정되었습니다.",
+          current: secondConflictCurrentTask,
+        },
+        { status: 409 },
+      ),
+    ];
+
+    server.use(
+      http.get("*/api/tasks", () => HttpResponse.json([movingTask])),
+      http.patch("*/api/tasks/:id", async ({ request }) => {
+        const body = (await request.json()) as Partial<Task> & {
+          version?: number;
+        };
+        patchRequests.push(body);
+        const response = patchResponses.shift();
+
+        if (!response) {
+          return HttpResponse.json(
+            { message: "예상하지 못한 요청입니다." },
+            { status: 500 },
+          );
+        }
+
+        return response;
+      }),
+    );
+
+    renderBoard();
+
+    await screen.findByText(movingTask.title);
+
+    dragTaskToColumn(movingTask, "done");
+
+    await waitFor(() =>
+      expect(patchRequests).toEqual([
+        expect.objectContaining({
+          status: "done",
+          version: movingTask.version,
+        }),
+        expect.objectContaining({
+          status: "done",
+          version: firstConflictCurrentTask.version,
+        }),
+      ]),
+    );
+
+    await waitFor(() => expectTaskInColumn(secondConflictCurrentTask, "To Do"));
+    expect(
+      within(getColumn("Done")).queryByText(secondConflictCurrentTask.title),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "다른 변경이 먼저 반영되어 서버 최신 상태로 갱신했습니다.",
+    );
+  });
+
   it("최신 이동 요청이 실패하면 이전 작업으로 되돌리고 안내한다", async () => {
     const movingTask = makeTask({ status: "todo", version: 1 });
 
