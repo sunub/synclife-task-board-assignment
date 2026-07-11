@@ -79,7 +79,6 @@ describe("Column 너비 기반 카드 높이 계산", () => {
         status="todo"
         taskIds={[task.id]}
         taskById={makeTaskMap([task])}
-        onMove={vi.fn()}
       />,
     );
 
@@ -99,7 +98,6 @@ describe("Column 너비 기반 카드 높이 계산", () => {
         status="todo"
         taskIds={[task.id]}
         taskById={makeTaskMap([task])}
-        onMove={vi.fn()}
       />,
     );
 
@@ -121,7 +119,6 @@ describe("Column 너비 기반 카드 높이 계산", () => {
         status="todo"
         taskIds={[task.id]}
         taskById={makeTaskMap([task])}
-        onMove={vi.fn()}
       />,
     );
 

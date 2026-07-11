@@ -32,7 +32,6 @@ describe("Column 선언적 표시", () => {
         status="todo"
         taskIds={[firstTask.id, secondTask.id]}
         taskById={makeTaskMap([firstTask, secondTask])}
-        onMove={vi.fn()}
       />,
     );
 
@@ -49,7 +48,6 @@ describe("Column 선언적 표시", () => {
         status="done"
         taskIds={[]}
         taskById={{}}
-        onMove={vi.fn()}
       />,
     );
 
@@ -71,7 +69,6 @@ describe("Column 선언적 표시", () => {
         status="todo"
         taskIds={tasks.map((task) => task.id)}
         taskById={makeTaskMap(tasks)}
-        onMove={vi.fn()}
       />,
     );
 
@@ -93,7 +90,6 @@ describe("Column", () => {
           [firstTask.id]: firstTask,
           [secondTask.id]: secondTask,
         }}
-        onMove={vi.fn()}
       />,
     );
 
