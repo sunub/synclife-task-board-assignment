@@ -1,8 +1,8 @@
 import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Column } from "../components/Column";
-import { estimateCardHeight } from "../components/utils";
-import { makeTask, makeTaskMap } from "./utils";
+import { Column } from "@/components/Column";
+import { estimateCardHeight } from "@/components/utils";
+import { makeTask, makeTaskMap } from "@/test/utils";
 
 let resizeObserverCallback:
   | ResizeObserverCallback
@@ -10,8 +10,8 @@ let resizeObserverCallback:
 const scrollToOffset = vi.fn();
 const scrollToIndex = vi.fn();
 
-vi.mock("../components/utils", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../components/utils")>();
+vi.mock("@/components/utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/utils")>();
 
   return {
     ...actual,

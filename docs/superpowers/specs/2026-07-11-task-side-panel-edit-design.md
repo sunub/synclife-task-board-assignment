@@ -1,146 +1,245 @@
-# Task Side Panel Edit Design
+# Task CRUD Side Panel 및 Optimistic UI 설계
 
-## Summary
+## 요약
 
-Task editing will use a single side panel edit form. Cards remain read-only board items whose responsibilities are display, drag movement, and opening the edit form through an explicit button.
+Task 수정은 단일 side panel form으로 처리한다. Card는 보드 위에서 task를 보여주는 read-only UI representation으로 남기고, 책임은 task 요약 표시, drag 이동, 명시적인 수정 버튼 제공으로 제한한다.
 
-The design intentionally avoids inline double-click editing, detail-view-first panel behavior, and success-path query invalidation. The goal is to keep editing separate from drag and virtualization concerns while preserving the existing normalized `TaskBoardModel` cache strategy.
+이 설계는 inline double-click 편집, 상세 보기 후 편집 전환, 성공 경로의 full-list query invalidation을 제외한다. 대신 README의 Priority 1 요구사항에 맞춰 이동, 수정, 삭제, 생성 모두 **UI를 먼저 반영한 뒤 서버에 요청하는 낙관적 업데이트**를 사용한다.
 
-## Goals
+`CONTEXT.md`의 용어를 따른다.
 
-- Allow a task to be edited from the board.
-- Keep only one task edit session active at a time.
-- Preserve the card as a stable read-only virtualized item.
-- Keep drag movement and edit saving as separate mutation flows.
-- Update the normalized query cache directly from the server task returned by `updateTask`.
-- Avoid refetching the full task list after a single edit save.
+- **Task**: 보드에서 관리하는 domain object
+- **Card**: task를 보드에 보여주는 visual representation
+- **Task Status**: task가 속한 Board Column을 결정하는 workflow state
+- **Column Display Order**: persisted manual order가 아니라 자동 표시 정책
 
-## Non-Goals
+## 목표
 
-- No inline card editing.
-- No double-click edit mode.
-- No card-level `Enter` keyboard shortcut for opening the editor.
-- No task detail read-only view before the edit form.
-- No dirty-change confirmation for the first implementation.
-- No success-path `invalidateQueries` after edit save.
-- No new dependency.
+- 보드에서 task를 생성, 수정, 삭제할 수 있게 한다.
+- 한 번에 하나의 task edit session만 활성화한다.
+- Card를 안정적인 read-only virtualized item으로 유지한다.
+- 이동, 수정, 삭제, 생성을 각각 낙관적으로 UI에 먼저 반영한다.
+- 실패 시 이전 `TaskBoardModel` 상태로 정확히 rollback하고 사용자에게 알린다.
+- 서버가 반환한 task를 사용해 normalized query cache를 직접 갱신한다.
+- 단일 task 변경 후 전체 task 목록을 다시 fetch하지 않는다.
+- Drag 이동과 form 기반 CRUD mutation의 책임을 분리한다.
 
-## UX Decisions
+## 비목표
 
-### Cards Stay Read-Only
+- Card 내부 inline editing은 제공하지 않는다.
+- Double-click edit mode는 제공하지 않는다.
+- Card 전체에 `Enter` keyboard shortcut을 붙여 editor를 열지 않는다.
+- Edit form 전에 task 상세 read-only view를 만들지 않는다.
+- 첫 구현에서는 dirty-change confirmation을 만들지 않는다.
+- 성공 경로에서 `invalidateQueries`를 사용하지 않는다.
+- Manual Column Order를 구현하지 않는다.
+- 새 dependency를 추가하지 않는다.
 
-`Card.tsx` should render the task title and metadata as read-only content. It should not own draft state and should not render an editable title input.
+## UX 결정
 
-This avoids conflicts between:
+### Card는 Read-Only로 유지한다
 
-- card dragging,
-- form focus,
-- double-click behavior,
-- virtual row height calculation,
-- optimistic move state,
-- edit draft state.
+`Card.tsx`는 task title과 metadata를 read-only content로 렌더링한다. Card는 draft state를 소유하지 않고, editable title input도 렌더링하지 않는다.
 
-### Explicit Edit Button
+이 결정은 다음 충돌을 피하기 위한 것이다.
 
-Each card should expose a clear edit button. Keyboard users reach it with `Tab` and activate it with the native button behavior, `Enter` or `Space`.
+- Card drag
+- Form focus
+- Double-click behavior
+- Virtual row height calculation
+- Optimistic move state
+- Edit draft state
 
-The card itself should not get a custom `onKeyDown` handler that opens the panel on `Enter`. A real button gives the action a clearer semantic target and avoids making the whole card behave like an oversized button.
+### 명시적인 수정 버튼을 둔다
 
-### Side Panel Opens Directly As Edit Form
+각 Card에는 task 수정 form을 여는 명확한 수정 버튼을 제공한다.
 
-The current requirement is editing, not detailed task inspection. Therefore, opening the side panel should show the form immediately.
+마우스 UX와 keyboard 접근성은 다음 정책을 따른다.
 
-The panel should include:
+- 수정 버튼은 항상 DOM에 존재하는 실제 `button`이어야 한다.
+- 버튼은 `Tab`으로 접근 가능해야 한다.
+- `Enter` 또는 `Space`는 native button behavior로 side panel을 연다.
+- Card hover 시 버튼을 시각적으로 더 명확히 보여준다.
+- Card focus-within 상태에서도 버튼을 시각적으로 보여준다.
+- Hover 상태일 때만 버튼을 mount/unmount하지 않는다.
+- Hover에 의존해서 keyboard 접근 가능 여부가 달라지면 안 된다.
 
-- title textarea,
-- priority control,
-- status control,
-- Save button,
-- Cancel button,
-- close button,
-- inline error area for save failures.
+즉, edit affordance는 마우스 사용자에게 hover/focus 시 분명하게 드러나야 하지만, 접근성은 hover 상태에 의존하지 않아야 한다.
 
-### Explicit Save Model
+Card 자체에는 panel을 여는 custom `onKeyDown` handler를 붙이지 않는다. 실제 `button`을 사용하는 편이 action target을 더 명확하게 만들고, Card 전체가 거대한 button처럼 동작하는 문제를 피할 수 있다.
 
-Only `Save` persists changes.
+### Side Panel은 곧바로 Edit Form으로 열린다
 
-The following actions discard the draft and close the panel:
+현재 요구사항은 task 상세 열람이 아니라 수정이다. 따라서 side panel을 열면 상세 view가 아니라 form을 바로 보여준다.
 
-- `Cancel`,
-- close button,
-- outside click,
-- `Escape`.
+Panel에는 다음 요소를 둔다.
 
-This gives the form a simple mental model: draft changes are local until `Save`.
+- Title textarea
+- Priority control
+- Status control
+- Save button
+- Delete button
+- Cancel button
+- Close button
+- Save/delete 실패를 표시하는 inline error area
 
-Dirty confirmation is intentionally excluded from the first implementation. It can be added later if long description editing or real-user feedback shows accidental input loss is a problem.
+### 명시적 저장 모델을 사용한다
 
-### Drag While Editing
+Form draft는 `Save`를 눌렀을 때만 mutation으로 제출한다.
 
-When the edit panel is open, dragging should be disabled at least for the edited task. Disabling all card drag while the panel is open is also acceptable and simpler.
+다음 동작은 draft를 버리고 panel을 닫는다.
 
-This is both a UX and data consistency decision. It prevents a user from editing a stale form while also moving the same task through the drag mutation flow.
+- `Cancel`
+- Close button
+- Outside click
+- `Escape`
 
-## State Model
+이 모델은 form의 mental model을 단순하게 만든다. Draft 변경은 `Save` 전까지 local 상태일 뿐이고, `Save`를 누르는 순간 낙관적 업데이트가 시작된다.
 
-The provider should own the single edit session.
+Dirty confirmation은 첫 구현 범위에서 제외한다. 향후 긴 description 편집이 추가되거나 실제 사용자 피드백에서 실수로 입력을 잃는 문제가 드러나면 추가한다.
+
+### 삭제는 확인 후 수행한다
+
+Task 삭제는 되돌릴 수 있는 서버 mutation이지만, 사용자 입장에서는 파괴적인 action이다. 따라서 삭제 버튼을 누르면 확인 dialog를 먼저 보여준다.
+
+정책:
+
+- 사용자가 삭제를 확인해야 delete mutation을 시작한다.
+- 확인 후에는 Card를 즉시 보드에서 제거한다.
+- 서버 실패 시 삭제 전 task를 cache에 복원하고 사용자에게 실패를 알린다.
+- 성공 시 별도 full-list refetch는 하지 않는다.
+
+### 생성은 별도 진입점에서 수행한다
+
+Task 생성은 Board 또는 Column 단위의 명시적인 create button에서 시작한다. 생성 form은 side panel을 재사용할 수 있지만, edit session과 mode를 구분한다.
+
+권장 UX:
+
+- Board 상단 또는 Column header에 create button을 둔다.
+- Column에서 생성하면 해당 column의 `status`를 초기값으로 사용한다.
+- Title과 priority는 필수로 입력받는다.
+- Description은 API가 허용하므로 선택값으로 둘 수 있다.
+- `Save`를 누르면 임시 task를 즉시 cache에 추가한다.
+- 서버 성공 시 임시 task를 서버 task로 교체한다.
+- 서버 실패 시 임시 task를 제거하고 사용자에게 실패를 알린다.
+
+### 편집 중 Drag
+
+Edit 또는 create panel이 열려 있는 동안에는 최소한 편집 중인 task의 drag를 비활성화한다. 구현을 단순하게 유지하려면 panel이 열려 있는 동안 모든 card drag를 비활성화해도 된다.
+
+이것은 UX 결정이면서 데이터 정합성 결정이기도 하다. 사용자가 stale form을 수정하는 동시에 같은 task를 drag mutation으로 이동시키는 상황을 방지한다.
+
+## 상태 모델
+
+Provider가 단일 form session을 소유한다.
 
 ```ts
-type EditingTaskState =
+type TaskFormState =
   | { mode: "idle" }
   | {
       mode: "editing";
       taskId: string;
-      draft: {
-        title: string;
-        priority: Priority;
-        status: Status;
-      };
+      draft: TaskFormDraft;
+      errorMessage?: string;
+    }
+  | {
+      mode: "creating";
+      draft: TaskFormDraft;
       errorMessage?: string;
     };
+
+type TaskFormDraft = {
+  title: string;
+  priority: Priority;
+  status: Status;
+  description?: string;
+};
 ```
 
-The draft should include only user-editable values. It should not store `version`.
+Draft에는 사용자가 수정할 수 있는 값만 포함한다. `version`은 draft에 저장하지 않는다.
 
-`version` should be read from the latest `TaskBoardModel` cache at save time. This avoids saving with a version captured when the panel first opened.
+Edit save의 `version`은 save 시점에 최신 `TaskBoardModel` cache에서 읽는다. 이렇게 해야 panel을 열 때 캡처한 오래된 version으로 저장하는 문제를 피할 수 있다.
 
-Recommended provider actions:
+권장 provider action은 다음과 같다.
 
 ```ts
 openEditor(task: Task): void
-updateDraft(patch: Partial<EditingTaskDraft>): void
-setSaveError(message: string): void
-clearSaveError(): void
-cancelEditor(): void
+openCreator(initialStatus?: Status): void
+updateDraft(patch: Partial<TaskFormDraft>): void
+setFormError(message: string): void
+clearFormError(): void
+cancelForm(): void
 ```
 
-The existing `Editting` naming is misspelled. If this feature touches the provider API, rename it to `Editing` before the typo spreads further.
+현재 `Editting` naming은 오타다. 이 기능이 provider API를 수정한다면, 오타가 더 퍼지기 전에 `Editing` 또는 `TaskForm`으로 rename하는 편이 좋다.
 
-## Data Flow
+## TaskBoardModel Helper
 
-### Opening The Panel
+이 설계는 mutation별로 다른 낙관적 업데이트를 수행하되, normalized cache 조작은 순수 helper로 분리한다.
 
-1. User activates the card edit button.
-2. Provider enters `editing` mode with the selected task id and an initial draft copied from the task.
-3. `TaskEditPanel` renders the form from provider state.
+권장 helper:
 
-### Canceling Or Closing
+```ts
+applyTaskPatchOptimistically(
+  model: TaskBoardModel,
+  taskId: string,
+  patch: Partial<Pick<Task, "title" | "priority" | "status" | "description">>,
+  updatedAt: string,
+): TaskBoardModel
 
-1. User clicks `Cancel`, close, outside the panel, or presses `Escape`.
-2. Provider returns to `idle`.
-3. No PATCH request is sent.
-4. The board cache remains unchanged.
+addTaskOptimistically(model: TaskBoardModel, task: Task): TaskBoardModel
 
-### Saving
+removeTaskOptimistically(model: TaskBoardModel, taskId: string): TaskBoardModel
 
-1. User clicks `Save`.
-2. `Board.tsx` or a small edit-save hook reads the latest task from `TaskBoardModel` cache by `taskId`.
-3. If the task is missing, the panel stays open and shows an error.
-4. Call `updateTask(taskId, { title, priority, status, version })`.
-5. On success, update the query cache with `applyServerTask(old, updatedTask)`.
-6. Close the panel.
+replaceTask(model: TaskBoardModel, previousTaskId: string, nextTask: Task): TaskBoardModel
+```
 
-Success handler:
+`applyServerTask`는 서버가 반환한 authoritative task를 cache에 반영하는 공통 성공/충돌 helper로 유지한다.
+
+Helper는 `idsByStatus`의 자동 정렬 불변식을 유지해야 한다.
+
+```ts
+// idsByStatus[status] is sorted by:
+// updatedAt desc, createdAt desc, id asc
+```
+
+Manual Column Order는 현재 API에 persisted rank가 없으므로 구현하지 않는다.
+
+## 데이터 흐름
+
+### Edit Panel 열기
+
+1. 사용자가 Card의 수정 버튼을 활성화한다.
+2. Provider는 선택한 task id와 task 값에서 복사한 초기 draft를 사용해 `editing` mode로 진입한다.
+3. `TaskEditPanel`은 provider state를 읽어 form을 렌더링한다.
+
+### Create Panel 열기
+
+1. 사용자가 create button을 활성화한다.
+2. Provider는 `creating` mode로 진입한다.
+3. Initial status는 create button이 위치한 Board Column을 우선 사용하고, 전역 create라면 기본값은 `todo`로 둔다.
+4. `TaskEditPanel` 또는 `TaskFormPanel`은 create draft를 렌더링한다.
+
+### 취소 또는 닫기
+
+1. 사용자가 `Cancel`, close button, panel 바깥 영역을 클릭하거나 `Escape`를 누른다.
+2. Provider는 `idle`로 돌아간다.
+3. 아직 mutation이 시작되지 않았다면 API request는 전송하지 않는다.
+4. Board cache는 변경하지 않는다.
+
+### 수정 저장
+
+1. 사용자가 editing mode에서 `Save`를 클릭한다.
+2. Save 시점에 `taskId`로 `TaskBoardModel` cache에서 최신 task를 읽는다.
+3. Task가 없으면 panel을 열어둔 채 error를 표시한다.
+4. 이전 task를 rollback context로 저장한다.
+5. `applyTaskPatchOptimistically`로 draft를 즉시 cache에 반영한다.
+6. `updateTask(taskId, { title, priority, status, description, version })`을 호출한다.
+7. 성공하면 `applyServerTask(old, updatedTask)`로 optimistic task를 서버 task로 확정한다.
+8. 실패하면 이전 task를 `applyServerTask`로 복원하고 사용자에게 실패를 알린다.
+9. 409 conflict이면 서버 current를 cache에 반영하고 draft는 보존한 채 conflict error를 표시한다.
+
+성공 handler는 다음 형태를 사용한다.
 
 ```ts
 queryClient.setQueryData<TaskBoardModel>(
@@ -149,79 +248,105 @@ queryClient.setQueryData<TaskBoardModel>(
 );
 ```
 
-Do not call `invalidateQueries` on the success path. The server already returns the authoritative updated task, and the normalized board model can update a single task without refetching every task.
+성공 경로에서는 `invalidateQueries`를 호출하지 않는다. 서버는 이미 authoritative updated task를 반환하고, normalized board model은 전체 task를 다시 fetch하지 않고도 단일 task를 갱신할 수 있다.
 
-## Mutation Policy
+### 삭제
 
-### Keep Move And Edit Mutations Separate
+1. 사용자가 delete button을 클릭한다.
+2. 확인 dialog에서 삭제를 확정한다.
+3. 삭제 전 task를 rollback context로 저장한다.
+4. `removeTaskOptimistically`로 task를 즉시 cache에서 제거한다.
+5. `deleteTask(taskId)`를 호출한다.
+6. 성공하면 cache를 추가로 refetch하지 않는다.
+7. 실패하면 rollback context의 task를 `applyServerTask` 또는 `addTaskOptimistically`로 복원하고 사용자에게 실패를 알린다.
 
-The current drag mutation is a move-specific mutation, even though it calls `updateTask`.
+삭제 성공 응답은 task를 반환하지 않으므로, 성공 시에는 optimistic removal을 그대로 확정한다.
 
-It is optimized for:
+### 생성
 
-- status-only movement,
-- optimistic move,
-- temporary optimistic `updatedAt`,
-- task-specific client sequence,
-- stale response suppression,
-- rollback of previous task position.
+1. 사용자가 creating mode에서 `Save`를 클릭한다.
+2. Client temporary id를 가진 optimistic task를 만든다.
+3. `addTaskOptimistically`로 즉시 cache에 추가한다.
+4. `createTask({ title, priority, status, description })`를 호출한다.
+5. 성공하면 `replaceTask(model, temporaryId, serverTask)`로 임시 task를 서버 task로 교체한다.
+6. 실패하면 `removeTaskOptimistically(model, temporaryId)`로 임시 task를 제거하고 사용자에게 실패를 알린다.
 
-The edit save mutation has different behavior:
+Temporary task는 UI에서 pending 상태를 표시할 수 있다. 단, pending flag는 서버 `Task` 타입에 저장하지 않고 UI-only metadata 또는 별도 mutation state로 관리한다.
 
-- patch can include title, priority, and status,
-- optimistic update is not required,
-- form can be disabled while saving,
-- draft should remain available after failure,
-- conflict handling should preserve user input.
+## Mutation 정책
 
-Therefore, do not force both flows into one generic mutation abstraction yet. Share small helpers such as `applyServerTask` and conflict payload parsing, but keep the mutation objects separate.
+### Move, Edit, Delete, Create Mutation은 분리한다
 
-### Edit Save Does Not Optimistically Update
+각 mutation은 모두 optimistic UI를 사용하지만 rollback context와 성공 처리 방식이 다르다.
 
-Edit save should wait for the server response before changing `TaskBoardModel`.
+- Move: status 변경, client sequence, stale response suppression, previous task rollback
+- Edit: title/priority/status/description patch, previous task rollback, conflict 시 draft 보존
+- Delete: previous task rollback, 성공 응답 task 없음
+- Create: temporary task 추가, 성공 시 temporary id를 server id로 교체
 
-This is acceptable because the form is an explicit save workflow, not a direct manipulation gesture like dragging. It also avoids showing a saved card state that might immediately fail with validation or conflict errors.
+따라서 네 흐름을 하나의 generic mutation abstraction으로 성급하게 합치지 않는다. `TaskBoardModel` helper, conflict payload parsing, notification helper 같은 작은 단위만 공유한다.
 
-### Conflict Handling
+### 모든 쓰기 작업은 Optimistic UI를 사용한다
 
-For 409 conflict responses:
+README의 Priority 1 요구사항에 따라 이동, 수정, 삭제, 생성은 모두 UI를 먼저 반영한 뒤 서버에 요청한다.
 
-1. If `ApiError.payload.current` contains a valid task, apply it to the cache with `applyServerTask`.
-2. Keep the panel open.
-3. Preserve the user's draft.
-4. Show a conflict error message.
+스피너를 띄우고 서버 성공 후에만 UI를 반영하는 방식은 요구사항을 만족하지 않는다.
 
-The first implementation should not auto-retry the user's draft against the new server version. That policy can be added later if needed.
+다만 mutation별로 optimistic UI의 범위는 다르게 둔다.
 
-## Virtualization Impact
+- Move: Card가 즉시 target status column으로 이동한다.
+- Edit: Card title, priority, status, description 변경이 즉시 cache에 반영된다.
+- Delete: Card가 즉시 보드에서 사라진다.
+- Create: 임시 Card가 즉시 보드에 나타난다.
 
-Side panel editing keeps form height outside the virtualized card row.
+### Conflict 처리
 
-This means `Column.tsx` can continue estimating card height from the read-only task title using Pretext. The virtualizer does not need to account for a growing textarea inside the card.
+409 conflict response가 발생하면 다음 정책을 따른다.
 
-When save succeeds, the returned task updates the cache. If the title changed, subsequent card height estimation uses the updated title.
+1. `ApiError.payload.current`에 유효한 task가 있으면 `applyServerTask`로 cache에 반영한다.
+2. Panel은 열린 상태로 유지한다.
+3. 사용자의 draft는 보존한다.
+4. Conflict error message를 표시한다.
 
-The existing fixed `300` width used by `estimateCardHeight` remains a separate virtualization improvement area. This edit design should not make that problem worse because editing no longer changes card DOM height before save.
+첫 구현에서는 사용자의 draft를 새 server version 기준으로 자동 재시도하지 않는다. 필요하면 이후 별도 정책으로 추가한다.
 
-## Testing Criteria
+## Virtualization 영향
 
-- Card renders title and metadata as read-only content.
-- Card exposes an accessible edit button.
-- Activating the edit button opens the side panel form.
-- The form initializes from the selected task.
-- Editing title, priority, and status changes only the provider draft before save.
-- `Cancel`, close button, outside click, and `Escape` close the panel without sending PATCH.
-- `Save` sends PATCH with the latest cached task version.
-- Successful save applies the returned task with `applyServerTask` and closes the panel.
-- Successful status edit moves the card to the returned task's status column.
-- Failed save keeps the panel open and preserves the draft.
-- 409 conflict applies `payload.current` to the cache but preserves the draft and shows an error.
-- Dragging is disabled while the edit panel is open, at least for the edited task.
-- Edit save success does not call `invalidateQueries`.
+Side panel editing은 form height를 virtualized card row 밖에 둔다.
 
-## Open Implementation Notes
+따라서 `Column.tsx`는 계속 read-only task title을 기준으로 Pretext 기반 card height를 계산하면 된다. Virtualizer는 Card 내부에서 커지는 textarea를 고려할 필요가 없다.
 
-- Prefer a native `select` for priority and status unless the existing `ComboBox.tsx` is upgraded to a complete accessible combobox.
-- If a side panel outside click handler is added, ensure clicks inside the panel do not bubble into the close behavior.
-- If the provider is renamed from `Editting` to `Editing`, update imports in one focused change.
-- Keep edit save tests separate from drag move tests so the two mutation policies remain understandable.
+Optimistic edit save가 title을 즉시 cache에 반영하면, 해당 Card의 read-only title이 즉시 바뀐다. 이때 Card height estimation도 optimistic title 기준으로 다시 계산되어야 한다.
+
+현재 `estimateCardHeight`에서 고정 width `300`을 사용하는 문제는 별도의 virtualization 개선 과제로 남긴다. 이번 설계는 저장 전 Card 내부에 textarea를 만들지 않으므로 form 높이가 virtual row height를 깨뜨리는 문제는 만들지 않는다.
+
+## 테스트 기준
+
+- Card는 title과 metadata를 read-only content로 렌더링한다.
+- Card는 접근 가능한 수정 버튼을 제공한다.
+- 수정 버튼은 hover/focus 시 시각적으로 드러나고, `Tab`으로 접근 가능하다.
+- 수정 버튼을 활성화하면 side panel form이 열린다.
+- Form은 선택한 task 값으로 초기화된다.
+- Title, priority, status, description 수정은 save 전에는 provider draft만 변경한다.
+- `Cancel`, close button, outside click, `Escape`는 mutation 없이 panel을 닫는다.
+- Edit `Save`는 최신 cached task version으로 PATCH를 보낸다.
+- Edit save 시작 시 draft가 cache에 낙관적으로 반영된다.
+- Edit save 성공 시 반환된 task를 `applyServerTask`로 반영하고 panel을 닫는다.
+- Edit save 실패 시 이전 task로 rollback하고 사용자에게 실패를 알린다.
+- Status edit 성공 시 Card는 반환된 task의 status column에 남는다.
+- 409 conflict는 `payload.current`를 cache에 반영하지만 draft는 보존하고 error를 표시한다.
+- Delete는 확인 dialog 이후 Card를 즉시 제거한다.
+- Delete 실패 시 삭제 전 task를 복원한다.
+- Create save 시작 시 임시 Card를 즉시 추가한다.
+- Create 성공 시 임시 Card를 서버 task로 교체한다.
+- Create 실패 시 임시 Card를 제거한다.
+- Edit/create panel이 열려 있는 동안에는 최소한 편집 중인 task의 drag가 비활성화된다.
+- 모든 write success path에서 `invalidateQueries`를 호출하지 않는다.
+
+## 구현 참고 사항
+
+- 기존 `ComboBox.tsx`를 완성도 있는 accessible combobox로 개선하지 않는 한, priority와 status에는 native `select`를 우선 사용한다.
+- Side panel outside click handler를 추가한다면, panel 내부 클릭이 close behavior로 bubble되지 않도록 처리한다.
+- Provider를 `Editting`에서 `Editing` 또는 `TaskForm`으로 rename한다면, import 갱신을 하나의 집중된 변경으로 처리한다.
+- Edit, move, delete, create test는 분리해서 작성한다. 그래야 mutation policy 차이를 이해하기 쉽다.
+- Optimistic helper는 순수 함수로 작성하고 rollback test를 우선 둔다.
