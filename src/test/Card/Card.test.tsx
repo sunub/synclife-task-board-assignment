@@ -1,8 +1,8 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import { Card } from '../components/Card';
-import type { Task } from '../types/task';
-import { makeTask as makeTaskFixture } from './utils';
+import { Card } from '@/components/Card';
+import type { Task } from '@/types/task';
+import { makeTask as makeTaskFixture } from '@/test/utils';
 
 const makeCardTask = (overrides: Partial<Task> = {}): Task =>
   makeTaskFixture('task-card-1', {
