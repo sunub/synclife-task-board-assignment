@@ -1,5 +1,5 @@
 import { http, HttpResponse, delay } from 'msw'
-import type { Task } from '../types'
+import type { Task } from "../types/task"
 import { getStore, setStore } from './db'
 import {
   WRITE_FAILURE_RATE,

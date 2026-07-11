@@ -1,4 +1,4 @@
-import type { Task } from '../types'
+import type { Task } from '../types/task'
 import { generateSeedTasks } from './seed'
 
 // mock "서버"의 저장소. 실제 백엔드는 없고, 이 가짜 서버가
