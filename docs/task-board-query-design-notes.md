@@ -202,9 +202,10 @@ type MoveContext = {
 
 기대 결과:
 
-- 같은 카드의 빠른 연속 이동에서 last-write-wins를 보장한다.
+- 같은 카드의 빠른 연속 이동에서 오래된 응답이 최신 UI 상태를 덮지 못하게 한다.
 - 첫 번째 요청 실패가 두 번째 이동 결과를 rollback하지 못한다.
 - 오래된 성공 응답도 최신 사용자 의도를 덮지 못한다.
+- 단, 서버가 이전 요청을 먼저 성공 처리해 `version`을 올린 뒤 최신 요청이 409를 받는 경우까지 last-write-wins로 만들려면 4.7의 rebase retry가 함께 필요하다.
 
 ### 4.6 Optimistic move에서도 `updatedAt`을 임시 갱신한다
 
@@ -223,23 +224,24 @@ type MoveContext = {
 - 서버 성공 후 카드 위치가 갑자기 다시 튀는 현상을 줄인다.
 - 시간 의존 로직을 테스트 가능한 순수 함수 경계 안에 둔다.
 
-### 4.7 409 Conflict는 단순 정책으로 처리한다
+### 4.7 최신 이동 요청의 409는 서버 version 위에 rebase retry한다
 
-우선은 다음 단순 정책으로 진행한다.
+409 처리도 요청 sequence를 먼저 확인한다.
 
 - 오래된 요청의 409는 무시한다.
 - 최신 요청의 409만 처리한다.
-- `ApiError.payload.current`에 담긴 서버 최신 task를 `TaskBoardModel`에 반영한다.
-- 사용자의 마지막 이동 의도를 자동 재시도하지 않는다.
-- 사용자에게 충돌로 인해 서버 최신 상태를 반영했다는 피드백을 제공한다.
+- `ApiError.payload.current`에 담긴 서버 최신 task를 `TaskBoardModel`에 반영해 클라이언트 기준점을 서버와 맞춘다.
+- 서버 최신 task의 `status`가 사용자의 마지막 target status와 다르고 아직 rebase retry를 하지 않았다면, 같은 target status를 `current.version`으로 한 번 더 PATCH한다.
+- rebase retry가 성공하면 서버가 반환한 task를 `applyServerTask`로 확정한다.
+- rebase retry까지 409가 발생하거나 서버 최신 task가 이미 target status와 같다면, 서버 최신 상태를 반영하고 사용자에게 충돌로 인해 서버 상태를 반영했다는 피드백을 제공한다.
 
-자동 재시도는 Priority 2 개선으로 남긴다. 예를 들어 최신 요청에서 409가 발생했을 때 서버 최신 `version`으로 마지막 이동 의도를 다시 PATCH하는 정책은 가능하지만, 첫 구현에서는 복잡도 대비 우선순위가 낮다.
+이 정책이 필요한 이유는 sequence만으로는 응답 순서 문제만 막을 수 있기 때문이다. 예를 들어 첫 번째 이동 요청이 서버에서 먼저 성공해 `version`을 올리고, 두 번째 최신 이동 요청이 오래된 `version`으로 409를 받으면, 서버 `current`를 그대로 반영하는 순간 사용자의 마지막 이동 의도가 사라진다. 따라서 최신 이동 요청의 409는 "서버 최신 version 위에 마지막 의도를 다시 얹는" 재시도 경로가 필요하다.
 
 기대 결과:
 
-- 409 발생 시 서버 정합성을 우선한다.
-- 최신 사용자 의도 자동 재시도보다 안정적인 충돌 복구를 먼저 구현한다.
-- README에서 409 UX가 Priority 2인 점과도 맞는다.
+- 서버 정합성은 `version`으로 지키고, 클라이언트의 최신 이동 의도는 sequence와 rebase retry로 지킨다.
+- 같은 task의 연속 이동에서 이전 요청이 서버 version을 먼저 올려도 마지막 target status가 서버에 다시 시도된다.
+- 무한 재시도를 피하기 위해 rebase retry는 한 번만 수행한다.
 
 ### 4.8 Mutation 피드백은 `Board.tsx`의 transient notice로 둔다
 
@@ -289,8 +291,8 @@ type MoveContext = {
 - optimistic move에서도 서버 성공 결과와 맞추기 위해 `updatedAt`을 임시 갱신한다.
 - `idsByStatus`는 항상 `updatedAt desc -> createdAt desc -> id asc` 정렬 불변식을 유지한다.
 - 검색/필터는 query cache가 아니라 selector에서 계산한다.
-- 같은 카드 연속 이동은 client-side sequence로 last-write-wins를 보장한다.
-- 409는 단순 정책으로 서버 최신 상태를 반영하고 자동 재시도는 후순위로 둔다.
+- 같은 카드 연속 이동은 client-side sequence로 오래된 응답을 무시하고, 최신 요청의 409는 서버 `current.version` 위에 마지막 이동 의도를 한 번 rebase retry한다.
+- 409 rebase retry까지 실패하면 서버 최신 상태를 반영하고 충돌을 안내한다.
 
 ## 6. 남은 한계와 후속 개선
 

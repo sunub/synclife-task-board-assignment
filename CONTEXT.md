@@ -27,3 +27,15 @@ _Avoid_: Updated date, manual rank
 **Manual Column Order**:
 A user-defined order of tasks within the same board column. This is a separate product concept from task status and requires a persisted rank or position to be reliable.
 _Avoid_: Status change, updated date
+
+**Move Intent**:
+The latest user-requested status change for a task while move requests are in flight. Client-side sequence decides which response belongs to the latest intent, and a 409 rebase retry can resend that intent with the server's latest version.
+_Avoid_: Server version, response arrival order
+
+**Rebased Move Retry**:
+A retry of the latest move intent after the server rejects it with 409 and returns the current task. The retry keeps the user's target status but uses `current.version` so the final request is based on the server's authoritative version.
+_Avoid_: Blind retry, stale rollback
+
+**Offline Read-Only State**:
+A temporary board state triggered by network disconnection (e.g., via `navigator.onLine` or API error). In this state, the board is locked to prevent task manipulation, avoiding guaranteed optimistic update rollbacks. This state is guaranteed only within the current browser session; refreshing the page drops the in-memory cache.
+_Avoid_: Full offline support, PWA
