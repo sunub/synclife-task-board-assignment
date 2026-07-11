@@ -1,4 +1,4 @@
-import type { Task, Priority, Status } from '../types'
+import type { Task, Priority, Status } from '../types/task'
 import { SEED_COUNT } from './config'
 
 const PRIORITIES: Priority[] = ['high', 'medium', 'low']

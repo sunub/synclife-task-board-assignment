@@ -13,4 +13,14 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
   },
+  build: {
+    minify: "esbuild",
+    chunkSizeWarningLimit: 2500,
+    assetsDir: "assets",
+    modulePreload: {
+      polyfill: true,
+    },
+    cssMinify: true,
+    cssCodeSplit: true,
+  },
 })

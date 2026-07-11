@@ -1,4 +1,4 @@
-import type { Task } from '../types'
+import type { Task } from '../types/task'
 
 // base 경로 하위로 요청해야 GitHub Pages 서브경로 배포 시에도
 // MSW 서비스워커(scope=base) 가 요청을 가로챌 수 있습니다.
