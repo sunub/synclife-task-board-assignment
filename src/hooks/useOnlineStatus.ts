@@ -1,13 +1,13 @@
-import { onlineManager } from "@tanstack/react-query";
-import { useSyncExternalStore } from "react";
+import { onlineManager } from "@tanstack/react-query"
+import { useSyncExternalStore } from "react"
 
 export function useOnlineStatus() {
     return useSyncExternalStore(
         (onStoreChange) =>
             onlineManager.subscribe(() => {
-                onStoreChange();
+                onStoreChange()
             }),
         () => onlineManager.isOnline(),
         () => true,
-    );
+    )
 }
