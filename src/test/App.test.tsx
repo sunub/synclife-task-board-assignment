@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import App from "@/App";
 import { makeTask } from "./utils";
 
@@ -32,6 +32,10 @@ afterAll(() => server.close());
 
 describe("App 초기 조회 상태", () => {
   it("초기 조회 실패를 에러 경계에서 보여주고 다시 시도하면 보드를 렌더링한다", async () => {
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
     const recoveredTask = makeTask("recovered-task", {
       title: "재시도 후 작업 recovered-task",
     });
@@ -52,17 +56,21 @@ describe("App 초기 조회 상태", () => {
       }),
     );
 
-    renderApp();
+    try {
+      renderApp();
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(
-      "초기 조회 실패",
-    );
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "초기 조회 실패",
+      );
 
-    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+      fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
 
-    await waitFor(() =>
-      expect(screen.getByText(recoveredTask.title)).toBeInTheDocument(),
-    );
-    expect(requestCount).toBe(2);
+      await waitFor(() =>
+        expect(screen.getByText(recoveredTask.title)).toBeInTheDocument(),
+      );
+      expect(requestCount).toBe(2);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
   });
 });
