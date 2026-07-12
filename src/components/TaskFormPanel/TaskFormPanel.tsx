@@ -1,4 +1,4 @@
-import { Priority, Status } from "../../types/task";
+import { prioritySchema, statusSchema } from "../../types/task";
 import type { TaskFormDraft, TaskFormState } from "@/types/form";
 
 interface TaskFormPanelProps {
@@ -78,7 +78,12 @@ export function TaskFormPanel({
           <select
             aria-label="우선순위"
             value={formState.draft.priority}
-            onChange={event => onChange({ priority: event.target.value as Priority })}
+            onChange={event => {
+              const result = prioritySchema.safeParse(event.target.value);
+              if (result.success) {
+                onChange({ priority: result.data });
+              }
+            }}
             disabled={isSubmitting}
           >
             <option value="high">High</option>
@@ -92,7 +97,12 @@ export function TaskFormPanel({
           <select
             aria-label="상태"
             value={formState.draft.status}
-            onChange={event => onChange({ status: event.target.value as Status })}
+            onChange={event => {
+              const result = statusSchema.safeParse(event.target.value);
+              if (result.success) {
+                onChange({ status: result.data });
+              }
+            }}
             disabled={isSubmitting}
           >
             <option value="todo">To Do</option>
