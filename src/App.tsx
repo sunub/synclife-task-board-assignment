@@ -1,23 +1,12 @@
 import { ErrorBoundary } from "react-error-boundary";
 import { QueryErrorResetBoundary } from "@tanstack/react-query";
 import Board from "./Board";
-import { Suspense, useState, useEffect } from "react";
+import { Suspense } from "react";
+import { useOnlineStatus } from "./hooks/useOnlineStatus";
 
 export default function App() {
-  const [isOffline, setIsOffline] = useState(!navigator.onLine);
-
-  useEffect(() => {
-    const handleOffline = () => setIsOffline(true);
-    const handleOnline = () => setIsOffline(false);
-
-    window.addEventListener("offline", handleOffline);
-    window.addEventListener("online", handleOnline);
-
-    return () => {
-      window.removeEventListener("offline", handleOffline);
-      window.removeEventListener("online", handleOnline);
-    };
-  }, []);
+  const isOnline = useOnlineStatus()
+  const mode = isOnline ? "editable" : "read-only";
 
   return (
     <div className="app">
@@ -28,7 +17,7 @@ export default function App() {
           참고하세요.
         </p>
       </header>
-      {isOffline && (
+      {!isOnline && (
         <div className="offline-indicator" style={{ backgroundColor: '#ffcccc', padding: '10px', textAlign: 'center', color: '#c00' }}>
           오프라인 상태입니다
         </div>
@@ -50,7 +39,7 @@ export default function App() {
             )}
           >
             <Suspense fallback={<p className="hint">불러오는 중…</p>}>
-              <Board isOffline={isOffline} />
+              <Board mode={mode} />
             </Suspense>
           </ErrorBoundary>
         )}

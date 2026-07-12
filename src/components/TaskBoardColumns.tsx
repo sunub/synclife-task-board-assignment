@@ -14,6 +14,7 @@ type TaskBoardColumnsProps = {
   onMove: (id: string, status: Status) => void;
   onEditTask: (task: Task) => void;
   dragDisabled: boolean;
+  editDisabled: boolean;
   scrollTargetByStatus: Partial<Record<Status, string>>;
   scrollToTopVersion: number;
 };
@@ -24,6 +25,7 @@ export function TaskBoardColumns({
   onMove,
   onEditTask,
   dragDisabled,
+  editDisabled,
   scrollTargetByStatus,
   scrollToTopVersion,
 }: TaskBoardColumnsProps) {
@@ -56,6 +58,7 @@ export function TaskBoardColumns({
             taskById={boardModel.byId}
             onEditTask={onEditTask}
             dragDisabled={dragDisabled}
+            editDisabled={editDisabled}
             scrollToTaskId={scrollTargetByStatus[col.status]}
             scrollToTopVersion={scrollToTopVersion}
           />

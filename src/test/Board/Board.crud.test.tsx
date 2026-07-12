@@ -9,6 +9,8 @@ import {
   makeTask,
   renderBoard,
   startBoardServer,
+  isPartialTask,
+  isPartialTaskWithVersion,
 } from './utils';
 
 const server = createBoardServer();
@@ -103,9 +105,8 @@ describe('보드 task form CRUD', () => {
         return HttpResponse.json([task]);
       }),
       http.patch('*/api/tasks/:id', async ({ request }) => {
-        const body = (await request.json()) as Partial<Task> & {
-          version?: number;
-        };
+        const json = await request.json();
+        const body = isPartialTaskWithVersion(json) ? json : {};
         patchRequests.push(body);
 
         return HttpResponse.json({
@@ -280,7 +281,9 @@ describe('보드 task form CRUD', () => {
     server.use(
       http.get('*/api/tasks', () => HttpResponse.json([])),
       http.post('*/api/tasks', async ({ request }) => {
-        postRequests.push((await request.json()) as Partial<Task>);
+        const rawJson = await request.json();
+        const json = isPartialTask(rawJson) ? rawJson : {};
+        postRequests.push(json);
         return createResponse.promise;
       })
     );
@@ -315,9 +318,9 @@ describe('보드 task form CRUD', () => {
     server.use(
       http.get('*/api/tasks', () => HttpResponse.json([task])),
       http.patch('*/api/tasks/:id', async ({ request }) => {
-        patchRequests.push(
-          (await request.json()) as Partial<Task> & { version?: number }
-        );
+        const rawJson = await request.json();
+        const json = isPartialTaskWithVersion(rawJson) ? rawJson : {};
+        patchRequests.push(json);
         return updateResponse.promise;
       })
     );
@@ -350,7 +353,7 @@ describe('보드 task form CRUD', () => {
     server.use(
       http.get('*/api/tasks', () => HttpResponse.json([task])),
       http.delete('*/api/tasks/:id', ({ params }) => {
-        deleteRequests.push(params.id as string);
+        deleteRequests.push(typeof params.id === "string" ? params.id : "");
         return deleteResponse.promise;
       })
     );

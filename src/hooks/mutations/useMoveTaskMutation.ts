@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useRef } from "react"
-import { updateTask } from "../api/client"
-import { defaultTaskQueryOptions } from "../api/query"
-import { applyServerTask, moveTaskOptimistically } from "../lib/tasks"
+import { updateTask } from "@/api/client"
+import { defaultTaskQueryOptions } from "@/api/query"
+import { applyServerTask, moveTaskOptimistically } from "@/lib/tasks"
+import type { BoardMode } from "@/types/board"
 import type {
     MoveTaskContext,
     MoveTaskVariables,
@@ -10,14 +11,16 @@ import type {
     Task,
     TaskBoardModel,
     TaskSortOptions,
-} from "../types/task"
+} from "@/types/task"
 import { getConflictCurrentTask } from "./utils"
 
 export function useMoveTaskMutation({
+    mode,
     sortOptions,
     onSuccess,
     onMessage,
 }: {
+    mode: BoardMode
     sortOptions: TaskSortOptions
     onSuccess?: (task: Task) => void
     onMessage?: (message: string, isError?: boolean) => void
@@ -49,12 +52,24 @@ export function useMoveTaskMutation({
         inFlightMoveCountByTaskId.current.set(taskId, nextCount)
     }
 
+    const isSupersededMove = (taskId: string, sequence: number) => {
+        return latestMoveSequenceByTaskId.current.get(taskId) !== sequence
+    }
+
+    const shouldRebaseAndRetry = (
+        currentTask: Task,
+        variables: MoveTaskVariables,
+    ) => {
+        return currentTask.status !== variables.status && !variables.rebased
+    }
+
     const mutation = useMutation<
         Task,
         unknown,
         MoveTaskVariables,
         MoveTaskContext
     >({
+        networkMode: "online",
         mutationFn: ({ id, status, version }) =>
             updateTask(id, { status, version }),
         onMutate: async ({ id, status }) => {
@@ -102,10 +117,7 @@ export function useMoveTaskMutation({
         onSuccess: (updatedTask, _variables, context) => {
             rememberConfirmedTask(updatedTask)
 
-            if (
-                latestMoveSequenceByTaskId.current.get(context.taskId) !==
-                context.sequence
-            ) {
+            if (isSupersededMove(context.taskId, context.sequence)) {
                 finishMove(context.taskId)
                 return
             }
@@ -119,10 +131,7 @@ export function useMoveTaskMutation({
         },
         onError: (error, variables, context) => {
             if (!context) return
-            if (
-                latestMoveSequenceByTaskId.current.get(context.taskId) !==
-                context.sequence
-            ) {
+            if (isSupersededMove(context.taskId, context.sequence)) {
                 const staleCurrentTask = getConflictCurrentTask(error)
 
                 if (staleCurrentTask) {
@@ -137,10 +146,7 @@ export function useMoveTaskMutation({
             if (currentTask) {
                 rememberConfirmedTask(currentTask)
 
-                if (
-                    currentTask.status !== variables.status &&
-                    !variables.rebased
-                ) {
+                if (shouldRebaseAndRetry(currentTask, variables)) {
                     queryClient.setQueryData<TaskBoardModel>(queryKey, (old) =>
                         old
                             ? applyServerTask(old, currentTask, sortOptions)
@@ -180,6 +186,11 @@ export function useMoveTaskMutation({
     })
 
     const moveTask = (id: string, status: Status) => {
+        if (mode === "read-only") {
+            onMessage?.("오프라인 상태에서는 작업을 이동할 수 없습니다.", true)
+            return
+        }
+
         const currentModel = queryClient.getQueryData<TaskBoardModel>(queryKey)
         const task = currentModel?.byId[id]
 
