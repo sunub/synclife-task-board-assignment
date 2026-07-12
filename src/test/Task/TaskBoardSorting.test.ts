@@ -98,4 +98,43 @@ describe("작업 보드 정렬 기준", () => {
             oldestUpdatedTask.id,
         ])
     })
+
+    it("여러 정렬 기준을 선택하면 선택한 순서대로 작업을 배치한다", () => {
+        const lowPriorityTask = makeTask("a-low-priority", {
+            title: "가 낮은 우선순위",
+            priority: "low",
+        })
+        const lastHighPriorityTitleTask = makeTask(
+            "b-last-high-priority-title",
+            {
+                title: "다 높은 우선순위",
+                priority: "high",
+            },
+        )
+        const firstHighPriorityTitleTask = makeTask(
+            "c-first-high-priority-title",
+            {
+                title: "가 높은 우선순위",
+                priority: "high",
+            },
+        )
+
+        const model = normalizeTasks(
+            [
+                lowPriorityTask,
+                lastHighPriorityTitleTask,
+                firstHighPriorityTitleTask,
+            ],
+            [
+                { sortBy: "priority", direction: "desc" },
+                { sortBy: "title", direction: "asc" },
+            ],
+        )
+
+        expect(model.idsByStatus.todo).toEqual([
+            firstHighPriorityTitleTask.id,
+            lastHighPriorityTitleTask.id,
+            lowPriorityTask.id,
+        ])
+    })
 })

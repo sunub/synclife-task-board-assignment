@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
-import type { Status } from "@/types/task";
+import type { Status, TaskSortKey } from "@/types/task";
 import {
   createBoardServer,
   dragTaskToColumn,
@@ -15,6 +15,33 @@ import {
 const server = createBoardServer();
 
 startBoardServer(server);
+
+const sortLabels: Record<TaskSortKey, string> = {
+  title: "제목 순",
+  priority: "우선순위",
+  createdAt: "생성 날짜",
+  updatedAt: "업데이트 날짜",
+};
+
+function changeSortOrder(sortKeys: TaskSortKey[]): void {
+  for (const removeButton of screen.queryAllByRole("button", {
+    name: /정렬 기준 제거$/,
+  })) {
+    fireEvent.click(removeButton);
+  }
+
+  const sortButton = screen.getByRole("button", {
+    name: /^정렬 기준/,
+  });
+
+  if (sortButton.getAttribute("aria-expanded") !== "true") {
+    fireEvent.click(sortButton);
+  }
+
+  for (const sortKey of sortKeys) {
+    fireEvent.click(screen.getByRole("option", { name: sortLabels[sortKey] }));
+  }
+}
 
 describe("보드 카드 이동 요청", () => {
   it("다른 컬럼으로 카드를 드롭할 때만 상태 변경 네트워크 요청을 보낸다", async () => {
@@ -77,9 +104,7 @@ describe("보드 카드 이동 요청", () => {
 
     renderBoard([movingTask, firstDoneTask, lastDoneTask]);
 
-    fireEvent.change(screen.getByRole("combobox", { name: "정렬 기준" }), {
-      target: { value: "title" },
-    });
+    changeSortOrder(["title"]);
     dragTaskToColumn(movingTask, "done");
 
     await waitFor(() => {

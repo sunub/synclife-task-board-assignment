@@ -1,7 +1,7 @@
 import { layout } from "@chenglou/pretext"
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { estimateCardHeight } from "@/components/utils"
 import { makeTask } from "@/test/utils"
+import { estimateCardHeight } from "@/utils/calculateLayout"
 
 vi.mock("@chenglou/pretext", () => ({
     prepare: vi.fn((text: string) => ({ text })),
