@@ -1,26 +1,12 @@
 import { describe, expect, it } from "vitest"
 import { normalizeTasks } from "@/lib/tasks"
 import { makeTask } from "@/test/utils"
-import type { Task, TaskBoardModel } from "@/types/task"
-
-type TaskSortKey = "title" | "priority" | "createdAt" | "updatedAt"
-type TaskSortDirection = "asc" | "desc"
-
-type SortOptions = {
-    sortBy: TaskSortKey
-    direction?: TaskSortDirection
-}
+import type { Task, TaskBoardModel, TaskSortOptions } from "@/types/task"
 
 const normalizeTasksWithSort = (
     tasks: Task[],
-    options: SortOptions,
-): TaskBoardModel =>
-    (
-        normalizeTasks as unknown as (
-            tasks: Task[],
-            options: SortOptions,
-        ) => TaskBoardModel
-    )(tasks, options)
+    options: TaskSortOptions,
+): TaskBoardModel => normalizeTasks(tasks, options)
 
 describe("작업 보드 정렬 기준", () => {
     it("제목 정렬 기준을 선택하면 같은 컬럼의 작업을 가나다순으로 정렬한다", () => {

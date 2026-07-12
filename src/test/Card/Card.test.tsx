@@ -1,8 +1,12 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { Card } from '@/components/Card';
 import type { Task } from '@/types/task';
 import { makeTask as makeTaskFixture } from '@/test/utils';
+
+const stylesSource = readFileSync(join(process.cwd(), 'src/styles.css'), 'utf8');
 
 const makeCardTask = (overrides: Partial<Task> = {}): Task =>
   makeTaskFixture('task-card-1', {
@@ -44,6 +48,13 @@ describe('Card 접근 가능한 표현', () => {
 
     expect(screen.queryByRole('textbox', { name: task.title })).not.toBeInTheDocument();
     expect(screen.getByText(task.title, { selector: '.card-title' })).toBeVisible();
+  });
+
+  it('카드 제목은 사용자가 입력한 줄바꿈을 보존하는 공백 정책으로 렌더링된다', () => {
+    const cardTitleRule = stylesSource.match(/\.card-title\s*\{[^}]*\}/)?.[0] ?? '';
+
+    expect(cardTitleRule).toContain('white-space: pre-wrap');
+    expect(cardTitleRule).toContain('overflow-wrap: anywhere');
   });
 
   it('카드는 명시적 수정 버튼을 제공하고 inline textbox를 열지 않는다', () => {

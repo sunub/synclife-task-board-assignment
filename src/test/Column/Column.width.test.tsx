@@ -40,13 +40,29 @@ vi.mock("@tanstack/react-virtual", () => ({
 
 function resizeColumnBody(width: number): void {
   act(() => {
-    resizeObserverCallback?.([
-      {
-        contentRect: {
-          width,
-        },
-      } as ResizeObserverEntry,
-    ], {} as ResizeObserver);
+    const entry: ResizeObserverEntry = {
+      target: document.createElement("div"),
+      contentRect: {
+        width,
+        height: 0,
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        x: 0,
+        y: 0,
+        toJSON: () => {},
+      },
+      borderBoxSize: [],
+      contentBoxSize: [],
+      devicePixelContentBoxSize: [],
+    };
+    const observer: ResizeObserver = {
+      observe: () => {},
+      unobserve: () => {},
+      disconnect: () => {},
+    };
+    resizeObserverCallback?.([entry], observer);
   });
 }
 

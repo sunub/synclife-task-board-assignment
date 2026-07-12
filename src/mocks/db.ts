@@ -1,4 +1,5 @@
 import type { Task } from "../types/task"
+import { taskListSchema } from "../types/task"
 import { generateSeedTasks } from "./seed"
 
 // mock "서버"의 저장소. 실제 백엔드는 없고, 이 가짜 서버가
@@ -11,7 +12,13 @@ const STORAGE_KEY = "taskboard.mockdb.v1"
 function read(): Task[] {
     try {
         const raw = localStorage.getItem(STORAGE_KEY)
-        if (raw) return JSON.parse(raw) as Task[]
+        if (raw) {
+            const parsed: unknown = JSON.parse(raw)
+            const result = taskListSchema.safeParse(parsed)
+            if (result.success) {
+                return result.data
+            }
+        }
     } catch {
         /* 파싱 실패 시 시드로 폴백 */
     }
@@ -46,8 +53,13 @@ export function resetMockDb(): Task[] {
     return store
 }
 
+declare global {
+    interface Window {
+        resetMockDb: typeof resetMockDb
+    }
+}
+
 // 개발 편의: 브라우저 콘솔에서 window.resetMockDb() 로 리셋
 if (typeof window !== "undefined") {
-    ;(window as unknown as { resetMockDb: typeof resetMockDb }).resetMockDb =
-        resetMockDb
+    window.resetMockDb = resetMockDb
 }

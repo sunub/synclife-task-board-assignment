@@ -1,1 +1,1 @@
-export type BoardMode = "read-only" | "editable";
+export type BoardMode = "read-only" | "editable"

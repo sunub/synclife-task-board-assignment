@@ -1,5 +1,6 @@
 import { delay, HttpResponse, http } from "msw"
-import type { Task } from "../types/task"
+import { z } from "zod"
+import { type Task, taskSchema } from "../types/task"
 import {
     MAX_LATENCY,
     MIN_LATENCY,
@@ -21,6 +22,11 @@ const serverError = () =>
         { status: 500 },
     )
 
+const CreateTaskSchema = taskSchema.partial()
+const UpdateTaskSchema = taskSchema
+    .partial()
+    .extend({ version: z.number().optional() })
+
 export const handlers = [
     // 전체 조회 — 5,000개를 한 번에 반환합니다.
     // '*/api/...' 와일드카드: base 서브경로(/repo/api/...) 배포도 함께 매칭됩니다.
@@ -35,7 +41,10 @@ export const handlers = [
         await latency()
         if (Math.random() < WRITE_FAILURE_RATE) return serverError()
 
-        const body = (await request.json()) as Partial<Task>
+        const json = await request.json()
+        const parsed = CreateTaskSchema.safeParse(json)
+        const body = parsed.success ? parsed.data : {}
+
         const now = new Date().toISOString()
         const task: Task = {
             id: crypto.randomUUID(),
@@ -58,10 +67,11 @@ export const handlers = [
         await latency()
         if (Math.random() < WRITE_FAILURE_RATE) return serverError()
 
-        const id = params.id as string
-        const body = (await request.json()) as Partial<Task> & {
-            version?: number
-        }
+        const id = typeof params.id === "string" ? params.id : ""
+        const json = await request.json()
+        const parsed = UpdateTaskSchema.safeParse(json)
+        const body = parsed.success ? parsed.data : {}
+
         const store = getStore()
         const idx = store.findIndex((t) => t.id === id)
         if (idx === -1) {
@@ -102,7 +112,7 @@ export const handlers = [
         await latency()
         if (Math.random() < WRITE_FAILURE_RATE) return serverError()
 
-        const id = params.id as string
+        const id = typeof params.id === "string" ? params.id : ""
         setStore(getStore().filter((t) => t.id !== id))
         return new HttpResponse(null, { status: 204 })
     }),

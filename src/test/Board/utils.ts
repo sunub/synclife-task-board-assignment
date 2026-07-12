@@ -10,6 +10,22 @@ import { normalizeTasks } from "@/lib/tasks"
 import { makeTask as makeTaskFixture } from "@/test/utils"
 import type { Status, Task } from "@/types/task"
 
+export function isPartialTask(val: unknown): val is Partial<Task> {
+    return typeof val === "object" && val !== null
+}
+
+export function isPartialTaskWithVersion(
+    val: unknown,
+): val is Partial<Task> & { version?: number } {
+    return typeof val === "object" && val !== null
+}
+
+export function isPartialTaskWithStatus(
+    val: unknown,
+): val is Partial<Task> & { status?: Status } {
+    return typeof val === "object" && val !== null
+}
+
 type DragEndHandler = (event: {
     canceled: boolean
     operation: {
@@ -136,7 +152,7 @@ export function resetTaskSequence(): void {
     nextTaskNumber = 1
 }
 
-export function makeDragDataTransfer(): DataTransfer {
+export function makeDragDataTransfer() {
     const data = new Map<string, string>()
 
     return {
@@ -152,7 +168,7 @@ export function makeDragDataTransfer(): DataTransfer {
 
             data.clear()
         },
-    } as DataTransfer
+    }
 }
 
 export function createQueryClient(tasks: Task[] = []): QueryClient {

@@ -1,3 +1,4 @@
+import { QueryClient } from "@tanstack/react-query"
 import { HttpResponse, http } from "msw"
 import { setupServer } from "msw/node"
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest"
@@ -37,7 +38,14 @@ describe("defaultTaskQueryOptions", () => {
             throw new Error("defaultTaskQueryOptions.queryFn이 필요합니다.")
         }
 
-        const model = await queryFn({} as never)
+        const context = {
+            client: new QueryClient(),
+            queryKey: ["tasks"],
+            meta: undefined,
+            signal: new AbortController().signal,
+        }
+
+        const model = await queryFn(context)
 
         expect(model).toEqual({
             byId: {

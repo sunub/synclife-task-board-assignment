@@ -16,7 +16,7 @@ export class ApiError extends Error {
     }
 }
 
-async function handle<T>(res: Response): Promise<T> {
+async function handleResponseError(res: Response): Promise<void> {
     if (!res.ok) {
         let payload: unknown = null
         try {
@@ -24,40 +24,52 @@ async function handle<T>(res: Response): Promise<T> {
         } catch {
             /* body 없음 */
         }
-        const message =
-            (payload as { message?: string } | null)?.message ??
-            `요청 실패 (${res.status})`
+        const isErrorPayload = (p: unknown): p is { message: string } =>
+            typeof p === "object" &&
+            p !== null &&
+            "message" in p &&
+            typeof (p as { message: unknown }).message === "string"
+
+        const message = isErrorPayload(payload)
+            ? payload.message
+            : `요청 실패 (${res.status})`
         throw new ApiError(res.status, message, payload)
     }
-    if (res.status === 204) return undefined as T
-    return res.json() as Promise<T>
 }
 
-export function getTasks(signal?: AbortSignal): Promise<Task[]> {
-    return fetch(`${BASE}/tasks`, { signal }).then((r) => handle<Task[]>(r))
+export async function getTasks(signal?: AbortSignal): Promise<Task[]> {
+    const res = await fetch(`${BASE}/tasks`, { signal })
+    await handleResponseError(res)
+    const data: Task[] = await res.json()
+    return data
 }
 
-export function createTask(input: Partial<Task>): Promise<Task> {
-    return fetch(`${BASE}/tasks`, {
+export async function createTask(input: Partial<Task>): Promise<Task> {
+    const res = await fetch(`${BASE}/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
-    }).then((r) => handle<Task>(r))
+    })
+    await handleResponseError(res)
+    const data: Task = await res.json()
+    return data
 }
 
-export function updateTask(
+export async function updateTask(
     id: string,
     patch: Partial<Task> & { version: number },
 ): Promise<Task> {
-    return fetch(`${BASE}/tasks/${id}`, {
+    const res = await fetch(`${BASE}/tasks/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(patch),
-    }).then((r) => handle<Task>(r))
+    })
+    await handleResponseError(res)
+    const data: Task = await res.json()
+    return data
 }
 
-export function deleteTask(id: string): Promise<void> {
-    return fetch(`${BASE}/tasks/${id}`, { method: "DELETE" }).then((r) =>
-        handle<void>(r),
-    )
+export async function deleteTask(id: string): Promise<void> {
+    const res = await fetch(`${BASE}/tasks/${id}`, { method: "DELETE" })
+    await handleResponseError(res)
 }

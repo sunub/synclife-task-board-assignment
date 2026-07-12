@@ -13,6 +13,7 @@ import {
   makeTask,
   renderBoard,
   startBoardServer,
+  isPartialTaskWithVersion,
 } from "./utils";
 
 type Deferred<T> = {
@@ -154,10 +155,10 @@ describe("보드 비동기 이동 처리", () => {
     server.use(
       http.get("*/api/tasks", () => HttpResponse.json(initialTasks)),
       http.patch("*/api/tasks/:id", async ({ request, params }) => {
-        const body = (await request.json()) as Partial<Task> & {
-          version?: number;
-        };
-        patchRequests.push({ id: params.id as string, body });
+        const json = await request.json();
+        const body = isPartialTaskWithVersion(json) ? json : {};
+        const id = typeof params.id === "string" ? params.id : "";
+        patchRequests.push({ id, body });
         const response = patchResponses.shift();
 
         if (!response) {
@@ -454,9 +455,8 @@ describe("보드 비동기 이동 처리", () => {
     server.use(
       http.get("*/api/tasks", () => HttpResponse.json([movingTask])),
       http.patch("*/api/tasks/:id", async ({ request }) => {
-        const body = (await request.json()) as Partial<Task> & {
-          version?: number;
-        };
+        const json = await request.json();
+        const body = isPartialTaskWithVersion(json) ? json : {};
         patchRequests.push(body);
         const response = patchResponses.shift();
 
@@ -573,9 +573,8 @@ describe("보드 비동기 이동 처리", () => {
     server.use(
       http.get("*/api/tasks", () => HttpResponse.json([movingTask])),
       http.patch("*/api/tasks/:id", async ({ request }) => {
-        const body = (await request.json()) as Partial<Task> & {
-          version?: number;
-        };
+        const json = await request.json();
+        const body = isPartialTaskWithVersion(json) ? json : {};
         patchRequests.push(body);
         const response = patchResponses.shift();
 

@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
-import type { Status, Task } from "@/types/task";
+import type { Status } from "@/types/task";
 import {
   createBoardServer,
   dragTaskToColumn,
@@ -9,6 +9,7 @@ import {
   makeTask,
   renderBoard,
   startBoardServer,
+  isPartialTaskWithStatus,
 } from "./utils";
 
 const server = createBoardServer();
@@ -22,11 +23,10 @@ describe("보드 카드 이동 요청", () => {
 
     server.use(
       http.patch("*/api/tasks/:id", async ({ params, request }) => {
-        const body = (await request.json()) as Partial<Task> & {
-          status?: Status;
-        };
+        const json = await request.json();
+        const body = isPartialTaskWithStatus(json) ? json : {};
         patchRequests.push({
-          id: params.id as string,
+          id: typeof params.id === "string" ? params.id : "",
           status: body.status ?? "todo",
         });
 
