@@ -82,9 +82,14 @@ export const TaskSortOptionsSchema = z.object({
     direction: TaskSortDirectionSchema.optional(),
 })
 
+export const TaskSortCriteriaSchema = z.union([
+    TaskSortOptionsSchema,
+    z.array(TaskSortOptionsSchema),
+])
+
 export const TaskBoardFiltersSchema = z.object({
     searchText: z.string(),
-    sortOptions: TaskSortOptionsSchema.optional(),
+    sortOptions: TaskSortCriteriaSchema.optional(),
 })
 
 export const TaskEditablePatchSchema = z
@@ -100,6 +105,7 @@ export type TaskSortKey = z.infer<typeof TaskSortKeySchema>
 export type TaskSortDirection = z.infer<typeof TaskSortDirectionSchema>
 
 export type TaskSortOptions = z.infer<typeof TaskSortOptionsSchema>
+export type TaskSortCriteria = z.infer<typeof TaskSortCriteriaSchema>
 
 export type TaskBoardFilters = z.infer<typeof TaskBoardFiltersSchema>
 

@@ -2,7 +2,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import type { Task, Status } from '../types/task';
 import { Card } from './Card';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { estimateCardHeight } from './utils';
+import { estimateCardHeight } from "@/utils/calculateLayout";
 import { useDroppable } from '@dnd-kit/react';
 
 interface Props {
