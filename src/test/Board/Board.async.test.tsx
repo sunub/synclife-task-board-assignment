@@ -226,6 +226,62 @@ describe("보드 비동기 이동 처리", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
+  it("같은 카드를 빠르게 연속 이동한 모든 요청이 실패하면 서버 확정 상태로 되돌린다", async () => {
+    const movingTask = makeTask({ status: "todo", version: 1 });
+    const firstPatch = createDeferred<Response>();
+    const secondPatch = createDeferred<Response>();
+    const patchResponses = [firstPatch, secondPatch];
+
+    server.use(
+      http.get("*/api/tasks", () => HttpResponse.json([movingTask])),
+      http.patch("*/api/tasks/:id", () => {
+        const response = patchResponses.shift();
+
+        if (!response) {
+          return HttpResponse.json(
+            { message: "예상하지 못한 요청입니다." },
+            { status: 500 },
+          );
+        }
+
+        return response.promise;
+      }),
+    );
+
+    renderBoard();
+
+    await screen.findByText(movingTask.title);
+
+    dragTaskToColumn(movingTask, "in-progress");
+    dragTaskToColumn(movingTask, "done");
+
+    await waitFor(() => expectTaskInColumn(movingTask, "Done"));
+
+    firstPatch.resolve(
+      HttpResponse.json(
+        { message: "일시적인 서버 오류입니다. 다시 시도해 주세요." },
+        { status: 500 },
+      ),
+    );
+    secondPatch.resolve(
+      HttpResponse.json(
+        { message: "일시적인 서버 오류입니다. 다시 시도해 주세요." },
+        { status: 500 },
+      ),
+    );
+
+    await waitFor(() => expectTaskInColumn(movingTask, "To Do"));
+    expect(
+      within(getColumn("In Progress")).queryByText(movingTask.title),
+    ).not.toBeInTheDocument();
+    expect(
+      within(getColumn("Done")).queryByText(movingTask.title),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "이동에 실패해 이전 상태로 되돌렸습니다.",
+    );
+  });
+
   it("같은 카드를 빠르게 연속 이동하면 이전 요청 성공은 최신 이동 상태를 덮지 않는다", async () => {
     const movingTask = makeTask({ status: "todo", version: 1 });
     const firstPatch = createDeferred<Response>();
