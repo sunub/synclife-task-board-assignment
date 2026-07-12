@@ -32,6 +32,10 @@ _Avoid_: Status change, updated date
 The latest user-requested status change for a task while move requests are in flight. Client-side sequence decides which response belongs to the latest intent, and a 409 rebase retry can resend that intent with the server's latest version.
 _Avoid_: Server version, response arrival order
 
+**Confirmed Task State**:
+The last task state accepted by the server. When every in-flight move for a task fails, the board returns to this state rather than to an intermediate optimistic state.
+_Avoid_: Previous UI state, optimistic rollback state
+
 **Rebased Move Retry**:
 A retry of the latest move intent after the server rejects it with 409 and returns the current task. The retry keeps the user's target status but uses `current.version` so the final request is based on the server's authoritative version.
 _Avoid_: Blind retry, stale rollback
