@@ -52,6 +52,17 @@ export function useMoveTaskMutation({
         inFlightMoveCountByTaskId.current.set(taskId, nextCount)
     }
 
+    const isSupersededMove = (taskId: string, sequence: number) => {
+        return latestMoveSequenceByTaskId.current.get(taskId) !== sequence
+    }
+
+    const shouldRebaseAndRetry = (
+        currentTask: Task,
+        variables: MoveTaskVariables,
+    ) => {
+        return currentTask.status !== variables.status && !variables.rebased
+    }
+
     const mutation = useMutation<
         Task,
         unknown,
@@ -106,10 +117,7 @@ export function useMoveTaskMutation({
         onSuccess: (updatedTask, _variables, context) => {
             rememberConfirmedTask(updatedTask)
 
-            if (
-                latestMoveSequenceByTaskId.current.get(context.taskId) !==
-                context.sequence
-            ) {
+            if (isSupersededMove(context.taskId, context.sequence)) {
                 finishMove(context.taskId)
                 return
             }
@@ -123,10 +131,7 @@ export function useMoveTaskMutation({
         },
         onError: (error, variables, context) => {
             if (!context) return
-            if (
-                latestMoveSequenceByTaskId.current.get(context.taskId) !==
-                context.sequence
-            ) {
+            if (isSupersededMove(context.taskId, context.sequence)) {
                 const staleCurrentTask = getConflictCurrentTask(error)
 
                 if (staleCurrentTask) {
@@ -141,10 +146,7 @@ export function useMoveTaskMutation({
             if (currentTask) {
                 rememberConfirmedTask(currentTask)
 
-                if (
-                    currentTask.status !== variables.status &&
-                    !variables.rebased
-                ) {
+                if (shouldRebaseAndRetry(currentTask, variables)) {
                     queryClient.setQueryData<TaskBoardModel>(queryKey, (old) =>
                         old
                             ? applyServerTask(old, currentTask, sortOptions)

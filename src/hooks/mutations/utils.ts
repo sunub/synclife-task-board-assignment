@@ -1,8 +1,12 @@
 import { ApiError } from "@/api/client"
 import { getConflictCurrentTaskFromPayload, type Task } from "@/types/task"
 
+const isConflictApiError = (error: unknown): error is ApiError => {
+    return error instanceof ApiError && error.status === 409
+}
+
 export function getConflictCurrentTask(error: unknown): Task | null {
-    if (!(error instanceof ApiError) || error.status !== 409) {
+    if (!isConflictApiError(error)) {
         return null
     }
     return getConflictCurrentTaskFromPayload(error.payload)
