@@ -1,0 +1,1 @@
+export type BoardMode = "read-only" | "editable";

@@ -1,13 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { updateTask } from "../api/client"
-import { defaultTaskQueryOptions } from "../api/query"
-import { applyServerTask, applyTaskPatchOptimistically } from "../lib/tasks"
+import { updateTask } from "@/api/client"
+import { defaultTaskQueryOptions } from "@/api/query"
+import { applyServerTask, applyTaskPatchOptimistically } from "@/lib/tasks"
+import type { BoardMode } from "@/types/board"
 import type {
     Task,
     TaskBoardModel,
     TaskEditablePatch,
     TaskSortOptions,
-} from "../types/task"
+} from "@/types/task"
 import { getConflictCurrentTask, getErrorMessage } from "./utils"
 
 type UpdateTaskVariables = {
@@ -21,10 +22,12 @@ type UpdateTaskContext = {
 }
 
 export function useUpdateTaskMutation({
+    mode,
     sortOptions,
     onSuccess,
     onError,
 }: {
+    mode: BoardMode
     sortOptions: TaskSortOptions
     onSuccess?: () => void
     onError?: (message: string) => void
@@ -33,12 +36,19 @@ export function useUpdateTaskMutation({
     const queryKey = defaultTaskQueryOptions.queryKey
 
     return useMutation<Task, unknown, UpdateTaskVariables, UpdateTaskContext>({
+        networkMode: "online",
         mutationFn: ({ id, patch, version }) =>
             updateTask(id, {
                 ...patch,
                 version,
             }),
         onMutate: async ({ id, patch }) => {
+            if (mode === "read-only") {
+                throw new Error(
+                    "오프라인 상태에서는 작업을 수정할 수 없습니다.",
+                )
+            }
+
             await queryClient.cancelQueries({ queryKey })
 
             const model = queryClient.getQueryData<TaskBoardModel>(queryKey)

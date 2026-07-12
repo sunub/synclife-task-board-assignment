@@ -12,6 +12,7 @@ interface Props {
   taskById: Record<string, Task>;
   onEditTask?: (task: Task) => void;
   dragDisabled?: boolean;
+  editDisabled?: boolean;
   scrollToTaskId?: string;
   scrollToTopVersion?: number;
 }
@@ -23,6 +24,7 @@ export function Column({
   taskById,
   onEditTask = () => { },
   dragDisabled = false,
+  editDisabled = false,
   scrollToTaskId,
   scrollToTopVersion = 0,
 }: Props) {
@@ -158,7 +160,12 @@ export function Column({
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
                 >
-                  <Card task={task} dragDisabled={dragDisabled} onEdit={onEditTask} />
+                  <Card
+                    task={task}
+                    dragDisabled={dragDisabled}
+                    editDisabled={editDisabled}
+                    onEdit={onEditTask}
+                  />
                 </div>
               );
             })}

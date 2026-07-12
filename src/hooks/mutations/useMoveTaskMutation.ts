@@ -1,8 +1,9 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useRef } from "react"
-import { updateTask } from "../api/client"
-import { defaultTaskQueryOptions } from "../api/query"
-import { applyServerTask, moveTaskOptimistically } from "../lib/tasks"
+import { updateTask } from "@/api/client"
+import { defaultTaskQueryOptions } from "@/api/query"
+import { applyServerTask, moveTaskOptimistically } from "@/lib/tasks"
+import type { BoardMode } from "@/types/board"
 import type {
     MoveTaskContext,
     MoveTaskVariables,
@@ -10,14 +11,16 @@ import type {
     Task,
     TaskBoardModel,
     TaskSortOptions,
-} from "../types/task"
+} from "@/types/task"
 import { getConflictCurrentTask } from "./utils"
 
 export function useMoveTaskMutation({
+    mode,
     sortOptions,
     onSuccess,
     onMessage,
 }: {
+    mode: BoardMode
     sortOptions: TaskSortOptions
     onSuccess?: (task: Task) => void
     onMessage?: (message: string, isError?: boolean) => void
@@ -55,6 +58,7 @@ export function useMoveTaskMutation({
         MoveTaskVariables,
         MoveTaskContext
     >({
+        networkMode: "online",
         mutationFn: ({ id, status, version }) =>
             updateTask(id, { status, version }),
         onMutate: async ({ id, status }) => {
@@ -180,6 +184,11 @@ export function useMoveTaskMutation({
     })
 
     const moveTask = (id: string, status: Status) => {
+        if (mode === "read-only") {
+            onMessage?.("오프라인 상태에서는 작업을 이동할 수 없습니다.", true)
+            return
+        }
+
         const currentModel = queryClient.getQueryData<TaskBoardModel>(queryKey)
         const task = currentModel?.byId[id]
 

@@ -10,10 +10,16 @@ import { useDraggable } from '@dnd-kit/react';
 interface CardProps {
   task: Task;
   dragDisabled?: boolean;
+  editDisabled?: boolean;
   onEdit?: (task: Task) => void;
 }
 
-export function Card({ task, dragDisabled = false, onEdit = () => { } }: CardProps) {
+export function Card({
+  task,
+  dragDisabled = false,
+  editDisabled = false,
+  onEdit = () => { },
+}: CardProps) {
   const { ref } = useDraggable({
     id: task.id,
     disabled: dragDisabled,
@@ -32,6 +38,7 @@ export function Card({ task, dragDisabled = false, onEdit = () => { } }: CardPro
           className="card-edit-button"
           aria-label={`${task.title} 수정`}
           onClick={() => onEdit(task)}
+          disabled={editDisabled}
         >
           수정
         </button>

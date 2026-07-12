@@ -60,4 +60,17 @@ describe('Card 접근 가능한 표현', () => {
     expect(onEdit).toHaveBeenCalledWith(task);
     expect(screen.queryByRole('textbox', { name: task.title })).not.toBeInTheDocument();
   });
+
+  it('수정이 비활성화되면 수정 요청을 보내지 않는다', () => {
+    const task = makeCardTask();
+    const onEdit = vi.fn();
+
+    render(<Card task={task} editDisabled onEdit={onEdit} />);
+
+    const editButton = screen.getByRole('button', { name: `${task.title} 수정` });
+
+    expect(editButton).toBeDisabled();
+    fireEvent.click(editButton);
+    expect(onEdit).not.toHaveBeenCalled();
+  });
 });

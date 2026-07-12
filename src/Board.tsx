@@ -8,15 +8,17 @@ import { TaskBoardColumns } from "./components/TaskBoardColumns";
 import { useTaskForm } from "./hooks/useTaskForm";
 import { useTaskBoardFilters } from "./hooks/useTaskBoardFilters";
 import { useTaskBoardInteraction } from "./hooks/useTaskBoardInteraction";
-import { useMoveTaskMutation } from "./mutations/useMoveTaskMutation";
-import { useCreateTaskMutation } from "./mutations/useCreateTaskMutation";
-import { useUpdateTaskMutation } from "./mutations/useUpdateTaskMutation";
-import { useDeleteTaskMutation } from "./mutations/useDeleteTaskMutation";
+import { useMoveTaskMutation } from "./hooks/mutations/useMoveTaskMutation";
+import { useCreateTaskMutation } from "./hooks/mutations/useCreateTaskMutation";
+import { useUpdateTaskMutation } from "./hooks/mutations/useUpdateTaskMutation";
+import { useDeleteTaskMutation } from "./hooks/mutations/useDeleteTaskMutation";
 import type { TaskSortKey } from "./types/task";
+import type { BoardMode } from "./types/board";
 
-export default function Board({ isOffline = false }: { isOffline?: boolean }) {
+export default function Board({ mode }: { mode: BoardMode }) {
   const { data: boardModel } = useSuspenseQuery(defaultTaskQueryOptions);
   const formRequestInFlightRef = useRef(false);
+  const isReadOnly = mode === "read-only";
 
   const form = useTaskForm();
   const filters = useTaskBoardFilters(boardModel);
@@ -32,6 +34,7 @@ export default function Board({ isOffline = false }: { isOffline?: boolean }) {
   };
 
   const moveMutation = useMoveTaskMutation({
+    mode,
     sortOptions: filters.sortOptions,
     onSuccess: (task) => {
       interaction.focusTask(task.status, task.id);
@@ -40,6 +43,7 @@ export default function Board({ isOffline = false }: { isOffline?: boolean }) {
   });
 
   const createMutation = useCreateTaskMutation({
+    mode,
     sortOptions: filters.sortOptions,
     onSuccess: () => {
       form.close();
@@ -51,6 +55,7 @@ export default function Board({ isOffline = false }: { isOffline?: boolean }) {
   });
 
   const updateMutation = useUpdateTaskMutation({
+    mode,
     sortOptions: filters.sortOptions,
     onSuccess: () => {
       form.close();
@@ -62,6 +67,7 @@ export default function Board({ isOffline = false }: { isOffline?: boolean }) {
   });
 
   const deleteMutation = useDeleteTaskMutation({
+    mode,
     sortOptions: filters.sortOptions,
     onSuccess: () => {
       form.close();
@@ -87,6 +93,11 @@ export default function Board({ isOffline = false }: { isOffline?: boolean }) {
   };
 
   const handleSave = () => {
+    if (isReadOnly) {
+      form.setError("오프라인 상태에서는 작업을 저장할 수 없습니다.");
+      return;
+    }
+
     if (formRequestInFlightRef.current || form.state.mode === "idle") {
       return;
     }
@@ -146,6 +157,11 @@ export default function Board({ isOffline = false }: { isOffline?: boolean }) {
   };
 
   const handleDelete = () => {
+    if (isReadOnly) {
+      form.setError("오프라인 상태에서는 작업을 삭제할 수 없습니다.");
+      return;
+    }
+
     if (formRequestInFlightRef.current || form.state.mode !== "editing") {
       return;
     }
@@ -169,6 +185,7 @@ export default function Board({ isOffline = false }: { isOffline?: boolean }) {
     createMutation.isPending ||
     updateMutation.isPending ||
     deleteMutation.isPending;
+  const isCardInteractionDisabled = isReadOnly || form.isOpen;
 
   return (
     <>
@@ -185,8 +202,8 @@ export default function Board({ isOffline = false }: { isOffline?: boolean }) {
         sortBy={filters.sortBy}
         changeSearchText={changeSearchText}
         changeSortBy={changeSortBy}
+        createDisabled={isReadOnly}
         openCreator={form.openCreator}
-        formState={form.state}
       />
 
       {totalTaskCount === 0 ? (
@@ -198,7 +215,8 @@ export default function Board({ isOffline = false }: { isOffline?: boolean }) {
         visibleTaskIdsByStatus={filters.visibleTaskIdsByStatus}
         onMove={moveMutation.moveTask}
         onEditTask={form.openEditor}
-        dragDisabled={form.isOpen || isOffline}
+        dragDisabled={isCardInteractionDisabled}
+        editDisabled={isReadOnly}
         scrollTargetByStatus={interaction.scrollTargetByStatus}
         scrollToTopVersion={interaction.scrollToTopVersion}
       />

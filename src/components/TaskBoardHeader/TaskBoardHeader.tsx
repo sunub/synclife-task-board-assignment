@@ -1,18 +1,24 @@
-import { TaskFormState } from '@/types/form';
 import { TaskSortKeySchema } from '@/types/task';
 import { useCallback } from 'react';
 import type { TaskSortKey } from '@/types/task';
 
 interface TaskBoardHeaderProps {
   openCreator: () => void;
+  createDisabled?: boolean;
   searchText: string;
   changeSearchText: (text: string) => void;
   sortBy: string;
   changeSortBy: (sortKey: TaskSortKey) => void;
-  formState: TaskFormState;
 }
 
-export function TaskBoardHeader({ openCreator, searchText, changeSearchText, sortBy, changeSortBy }: TaskBoardHeaderProps) {
+export function TaskBoardHeader({
+  openCreator,
+  createDisabled = false,
+  searchText,
+  changeSearchText,
+  sortBy,
+  changeSortBy,
+}: TaskBoardHeaderProps) {
     const handleSortByChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
         const selectedSortKey = event.target.value;
         const parsedSortKey = TaskSortKeySchema.safeParse(selectedSortKey);
@@ -29,7 +35,11 @@ export function TaskBoardHeader({ openCreator, searchText, changeSearchText, sor
 
     return (
         <div className="board-toolbar">
-        <button type="button" onClick={() => openCreator()}>
+        <button
+          type="button"
+          onClick={() => openCreator()}
+          disabled={createDisabled}
+        >
           작업 만들기
         </button>
         <input

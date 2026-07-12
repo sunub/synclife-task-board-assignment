@@ -1,5 +1,5 @@
-import { ApiError } from "../api/client"
-import { getConflictCurrentTaskFromPayload, type Task } from "../types/task"
+import { ApiError } from "@/api/client"
+import { getConflictCurrentTaskFromPayload, type Task } from "@/types/task"
 
 export function getConflictCurrentTask(error: unknown): Task | null {
     if (!(error instanceof ApiError) || error.status !== 409) {
