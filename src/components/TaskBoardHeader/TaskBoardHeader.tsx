@@ -19,29 +19,23 @@ export function TaskBoardHeader({
   sortBy,
   changeSortBy,
 }: TaskBoardHeaderProps) {
-    const handleSortByChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
-        const selectedSortKey = event.target.value;
-        const parsedSortKey = TaskSortKeySchema.safeParse(selectedSortKey);
-        if (!parsedSortKey.success) {
-            console.error(`Invalid sort key: ${selectedSortKey}`);
-            return;
-        }
-        changeSortBy(parsedSortKey.data);
-    }, [changeSortBy]);
+  const handleSortByChange = useCallback((event: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedSortKey = event.target.value;
+    const parsedSortKey = TaskSortKeySchema.safeParse(selectedSortKey);
+    if (!parsedSortKey.success) {
+      console.error(`Invalid sort key: ${selectedSortKey}`);
+      return;
+    }
+    changeSortBy(parsedSortKey.data);
+  }, [changeSortBy]);
 
-    const handleSearchTextChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-        changeSearchText(event.target.value);
-    }, [changeSearchText]);
+  const handleSearchTextChange = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    changeSearchText(event.target.value);
+  }, [changeSearchText]);
 
-    return (
-        <div className="board-toolbar">
-        <button
-          type="button"
-          onClick={() => openCreator()}
-          disabled={createDisabled}
-        >
-          작업 만들기
-        </button>
+  return (
+    <div className="board-toolbar">
+      <div>
         <input
           aria-label="작업 검색"
           type="search"
@@ -59,5 +53,16 @@ export function TaskBoardHeader({
           <option value="updatedAt">업데이트 날짜</option>
         </select>
       </div>
-    )
+
+
+      <button
+        type="button"
+        className='create-task-button'
+        onClick={() => openCreator()}
+        disabled={createDisabled}
+      >
+        작업 만들기
+      </button>
+    </div>
+  )
 }
