@@ -4,6 +4,7 @@ import type {
     TaskBoardFilters,
     TaskBoardModel,
     TaskEditablePatch,
+    TaskSortCriteria,
     TaskSortKey,
     TaskSortOptions,
 } from "../types/task"
@@ -24,13 +25,29 @@ const titleCollator = new Intl.Collator("ko-KR", {
     sensitivity: "base",
 })
 
-function normalizeSortOptions(
+function normalizeSortOption(
     options?: TaskSortOptions,
 ): Required<TaskSortOptions> {
     return {
         sortBy: options?.sortBy ?? DEFAULT_TASK_SORT.sortBy,
         direction: options?.direction ?? DEFAULT_TASK_SORT.direction,
     }
+}
+
+function normalizeSortCriteria(
+    options?: TaskSortCriteria,
+): Array<Required<TaskSortOptions>> {
+    if (!options) {
+        return [DEFAULT_TASK_SORT]
+    }
+
+    const criteria = Array.isArray(options) ? options : [options]
+
+    if (criteria.length === 0) {
+        return [DEFAULT_TASK_SORT]
+    }
+
+    return criteria.map(normalizeSortOption)
 }
 
 function compareBySortKey(a: Task, b: Task, sortBy: TaskSortKey): number {
@@ -48,14 +65,17 @@ function compareBySortKey(a: Task, b: Task, sortBy: TaskSortKey): number {
 function compareTasksForBoard(
     a: Task,
     b: Task,
-    options?: TaskSortOptions,
+    options?: TaskSortCriteria,
 ): number {
-    const sortOptions = normalizeSortOptions(options)
-    const directionMultiplier = sortOptions.direction === "asc" ? 1 : -1
-    const primaryDiff =
-        compareBySortKey(a, b, sortOptions.sortBy) * directionMultiplier
+    const sortCriteria = normalizeSortCriteria(options)
 
-    if (primaryDiff !== 0) return primaryDiff
+    for (const sortOptions of sortCriteria) {
+        const directionMultiplier = sortOptions.direction === "asc" ? 1 : -1
+        const primaryDiff =
+            compareBySortKey(a, b, sortOptions.sortBy) * directionMultiplier
+
+        if (primaryDiff !== 0) return primaryDiff
+    }
 
     const createdAtDiff = Date.parse(b.createdAt) - Date.parse(a.createdAt)
     if (createdAtDiff !== 0) return createdAtDiff
@@ -66,7 +86,7 @@ function compareTasksForBoard(
 function sortTaskIdsByBoardOrder(
     ids: string[],
     byId: Record<string, Task>,
-    options?: TaskSortOptions,
+    options?: TaskSortCriteria,
 ): string[] {
     return [...ids].sort((a: string, b: string) =>
         compareTasksForBoard(byId[a], byId[b], options),
@@ -83,7 +103,7 @@ function createEmptyIdsByStatus(): Record<Status, string[]> {
 
 export function normalizeTasks(
     tasks: Task[],
-    options?: TaskSortOptions,
+    options?: TaskSortCriteria,
 ): TaskBoardModel {
     const byId: Record<string, Task> = {}
     const idsByStatus = createEmptyIdsByStatus()
@@ -112,7 +132,7 @@ export function moveTaskOptimistically(
     id: string,
     status: Status,
     updatedAt: string,
-    options?: TaskSortOptions,
+    options?: TaskSortCriteria,
 ): TaskBoardModel {
     const task = model.byId[id]
 
@@ -150,7 +170,7 @@ export function moveTaskOptimistically(
 export function applyServerTask(
     model: TaskBoardModel,
     task: Task,
-    options?: TaskSortOptions,
+    options?: TaskSortCriteria,
 ): TaskBoardModel {
     const byId: Record<string, Task> = {
         ...model.byId,
@@ -181,7 +201,7 @@ export function applyTaskPatchOptimistically(
     taskId: string,
     patch: TaskEditablePatch,
     updatedAt: string,
-    options?: TaskSortOptions,
+    options?: TaskSortCriteria,
 ): TaskBoardModel {
     const task = model.byId[taskId]
 
@@ -201,7 +221,7 @@ export function applyTaskPatchOptimistically(
 export function addTaskOptimistically(
     model: TaskBoardModel,
     task: Task,
-    options?: TaskSortOptions,
+    options?: TaskSortCriteria,
 ): TaskBoardModel {
     return applyServerTask(model, task, options)
 }
@@ -230,7 +250,7 @@ export function replaceTask(
     model: TaskBoardModel,
     previousTaskId: string,
     nextTask: Task,
-    options?: TaskSortOptions,
+    options?: TaskSortCriteria,
 ): TaskBoardModel {
     return applyServerTask(
         removeTaskOptimistically(model, previousTaskId),

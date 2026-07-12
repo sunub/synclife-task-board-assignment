@@ -1,7 +1,7 @@
 import { act, render } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Column } from "@/components/Column";
-import { estimateCardHeight } from "@/components/utils";
+import { estimateCardHeight } from "@/utils/calculateLayout";
 import { makeTask, makeTaskMap } from "@/test/utils";
 
 let resizeObserverCallback:
@@ -10,8 +10,8 @@ let resizeObserverCallback:
 const scrollToOffset = vi.fn();
 const scrollToIndex = vi.fn();
 
-vi.mock("@/components/utils", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/components/utils")>();
+vi.mock("@/utils/calculateLayout", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/calculateLayout")>();
 
   return {
     ...actual,
@@ -51,16 +51,16 @@ function resizeColumnBody(width: number): void {
         left: 0,
         x: 0,
         y: 0,
-        toJSON: () => {},
+        toJSON: () => { },
       },
       borderBoxSize: [],
       contentBoxSize: [],
       devicePixelContentBoxSize: [],
     };
     const observer: ResizeObserver = {
-      observe: () => {},
-      unobserve: () => {},
-      disconnect: () => {},
+      observe: () => { },
+      unobserve: () => { },
+      disconnect: () => { },
     };
     resizeObserverCallback?.([entry], observer);
   });
@@ -78,9 +78,9 @@ describe("Column 너비 기반 카드 높이 계산", () => {
         resizeObserverCallback = callback;
       }
 
-      observe(): void {}
-      unobserve(): void {}
-      disconnect(): void {}
+      observe(): void { }
+      unobserve(): void { }
+      disconnect(): void { }
     };
   });
 

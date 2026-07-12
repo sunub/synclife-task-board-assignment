@@ -28,13 +28,24 @@ export default function App() {
             onReset={reset}
             fallbackRender={({ error, resetErrorBoundary }) => (
               <div role="alert" className="error">
-                <p>앗, 오류가 발생했습니다:</p>
-                <pre>
+                <span className="error-eyebrow">오류</span>
+                <h2>앗, 오류가 발생했습니다</h2>
+                <p>
+                  잠시 후 다시 시도해 주세요. 문제가 계속되면 새로고침 후
+                  다시 확인해 주세요.
+                </p>
+                <pre className="error-message">
                   {error instanceof Error
                     ? error.message
                     : "알 수 없는 오류입니다."}
                 </pre>
-                <button onClick={resetErrorBoundary}>다시 시도</button>
+                <button
+                  type="button"
+                  className="error-retry-button"
+                  onClick={resetErrorBoundary}
+                >
+                  다시 시도
+                </button>
               </div>
             )}
           >

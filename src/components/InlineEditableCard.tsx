@@ -4,7 +4,7 @@ import {
   getBadgeClassName,
   getCardClassName,
   getPriorityLabel,
-} from "./utils";
+} from "@/utils/calculateLayout";
 
 export function Card({ task }: { task: Task }) {
   return (
@@ -13,12 +13,6 @@ export function Card({ task }: { task: Task }) {
       draggable
       onDragStart={(e) => e.dataTransfer.setData("text/plain", task.id)}
     >
-      {/* <div className="card-title"> */}
-      {/*   <label className="sr-only" htmlFor={`card-${task.id}`}> */}
-      {/*     {task.title} */}
-      {/*   </label> */}
-      {/*   <input type="tel" id={`card-${task.id}`} value={task.id} readOnly /> */}
-      {/* </div> */}
       <div className="card-title">{task.title}</div>
 
       <div className="card-meta">

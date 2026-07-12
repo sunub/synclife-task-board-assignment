@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import type { TaskSortKey } from "@/types/task";
 import {
   createBoardServer,
   dragTaskToColumn,
@@ -16,6 +17,36 @@ const server = createBoardServer();
 startBoardServer(server, () => {
   vi.restoreAllMocks();
 });
+
+const sortLabels: Record<TaskSortKey, string> = {
+  title: "제목 순",
+  priority: "우선순위",
+  createdAt: "생성 날짜",
+  updatedAt: "업데이트 날짜",
+};
+
+function changeSortOrder(sortKeys: TaskSortKey[]): void {
+  for (const removeButton of screen.queryAllByRole("button", {
+    name: /정렬 기준 제거$/,
+  })) {
+    fireEvent.click(removeButton);
+  }
+
+  scrollToOffsetMock.mockClear();
+  scrollToIndexMock.mockClear();
+
+  const sortButton = screen.getByRole("button", {
+    name: /^정렬 기준/,
+  });
+
+  if (sortButton.getAttribute("aria-expanded") !== "true") {
+    fireEvent.click(sortButton);
+  }
+
+  for (const sortKey of sortKeys) {
+    fireEvent.click(screen.getByRole("option", { name: sortLabels[sortKey] }));
+  }
+}
 
 describe("보드 이동 후 스크롤", () => {
   it("다른 컬럼으로 이동한 카드는 정렬된 최종 위치가 보이도록 스크롤된다", async () => {
@@ -46,9 +77,7 @@ describe("보드 이동 후 스크롤", () => {
 
     renderBoard([movingTask, ...doneTasks]);
 
-    fireEvent.change(screen.getByRole("combobox", { name: "정렬 기준" }), {
-      target: { value: "title" },
-    });
+    changeSortOrder(["title"]);
     scrollToOffsetMock.mockClear();
     dragTaskToColumn(movingTask, "done");
 
@@ -94,17 +123,13 @@ describe("보드 이동 후 스크롤", () => {
       renderBoard(tasks);
 
       if (sortValue === "updatedAt") {
-        fireEvent.change(screen.getByRole("combobox", { name: "정렬 기준" }), {
-          target: { value: "title" },
-        });
+        changeSortOrder(["title"]);
       }
 
       scrollToOffsetMock.mockClear();
       scrollToIndexMock.mockClear();
 
-      fireEvent.change(screen.getByRole("combobox", { name: "정렬 기준" }), {
-        target: { value: sortValue },
-      });
+      changeSortOrder([sortValue as TaskSortKey]);
 
       await waitFor(() => {
         expect(scrollToOffsetMock).toHaveBeenCalledTimes(3);

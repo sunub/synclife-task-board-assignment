@@ -7,7 +7,7 @@ import type {
     Task,
     TaskBoardModel,
     TaskEditablePatch,
-    TaskSortOptions,
+    TaskSortCriteria,
 } from "@/types/task"
 import { getConflictCurrentTask, getErrorMessage } from "./utils"
 
@@ -28,7 +28,7 @@ export function useUpdateTaskMutation({
     onError,
 }: {
     mode: BoardMode
-    sortOptions: TaskSortOptions
+    sortOptions: TaskSortCriteria
     onSuccess?: () => void
     onError?: (message: string) => void
 }) {

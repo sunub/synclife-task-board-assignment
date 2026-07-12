@@ -83,7 +83,7 @@ export default function Board({ mode }: { mode: BoardMode }) {
     interaction.scrollToTop();
   };
 
-  const changeSortBy = (sortBy: TaskSortKey) => {
+  const changeSortBy = (sortBy: TaskSortKey[]) => {
     filters.changeSortBy(sortBy);
     interaction.scrollToTop();
   };

@@ -3,6 +3,7 @@ import { debounce } from "@/utils/debounce"
 import { selectVisibleTaskIdsByStatus } from "../lib/tasks"
 import type {
     TaskBoardModel,
+    TaskSortCriteria,
     TaskSortKey,
     TaskSortOptions,
 } from "../types/task"
@@ -17,8 +18,10 @@ export const SORT_OPTIONS: Record<TaskSortKey, TaskSortOptions> = {
 export function useTaskBoardFilters(boardModel: TaskBoardModel) {
     const [searchText, setSearchText] = useState("")
     const [filterSearchText, setFilterSearchText] = useState("")
-    const [sortBy, setSortBy] = useState<TaskSortKey>("updatedAt")
-    const sortOptions = SORT_OPTIONS[sortBy]
+    const [sortBy, setSortBy] = useState<TaskSortKey[]>([])
+    const sortOptions: TaskSortCriteria = sortBy.map(
+        (sortKey) => SORT_OPTIONS[sortKey],
+    )
 
     const debouncedSetFilterSearchText = useMemo(
         () =>

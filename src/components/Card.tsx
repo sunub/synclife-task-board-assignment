@@ -4,7 +4,7 @@ import {
   getBadgeClassName,
   getCardClassName,
   getPriorityLabel,
-} from './utils';
+} from '@/utils/calculateLayout';
 import { useDraggable } from '@dnd-kit/react';
 
 interface CardProps {

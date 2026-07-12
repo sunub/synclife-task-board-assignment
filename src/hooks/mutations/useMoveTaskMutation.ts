@@ -10,7 +10,7 @@ import type {
     Status,
     Task,
     TaskBoardModel,
-    TaskSortOptions,
+    TaskSortCriteria,
 } from "@/types/task"
 import { getConflictCurrentTask } from "./utils"
 
@@ -21,7 +21,7 @@ export function useMoveTaskMutation({
     onMessage,
 }: {
     mode: BoardMode
-    sortOptions: TaskSortOptions
+    sortOptions: TaskSortCriteria
     onSuccess?: (task: Task) => void
     onMessage?: (message: string, isError?: boolean) => void
 }) {

@@ -3,7 +3,7 @@ import { deleteTask } from "@/api/client"
 import { defaultTaskQueryOptions } from "@/api/query"
 import { addTaskOptimistically, removeTaskOptimistically } from "@/lib/tasks"
 import type { BoardMode } from "@/types/board"
-import type { Task, TaskBoardModel, TaskSortOptions } from "@/types/task"
+import type { Task, TaskBoardModel, TaskSortCriteria } from "@/types/task"
 import { getErrorMessage } from "./utils"
 
 type DeleteTaskVariables = {
@@ -21,7 +21,7 @@ export function useDeleteTaskMutation({
     onError,
 }: {
     mode: BoardMode
-    sortOptions: TaskSortOptions
+    sortOptions: TaskSortCriteria
     onSuccess?: () => void
     onError?: (message: string) => void
 }) {
