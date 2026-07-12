@@ -102,10 +102,13 @@ describe("보드 검색 기능", () => {
       target: { value: "결제" },
     });
 
-    expectTaskInColumn(matchingTask, "To Do");
-    expect(
-      within(getColumn("To Do")).queryByText(hiddenTask.title),
-    ).not.toBeInTheDocument();
+    await waitFor(() => {
+      expectTaskInColumn(matchingTask, "To Do");
+      expect(
+        within(getColumn("To Do")).queryByText(hiddenTask.title),
+      ).not.toBeInTheDocument();
+    });
+
     expect(queryClient.getQueryData(defaultTaskQueryOptions.queryKey)).toEqual(
       normalizeTasks([matchingTask, hiddenTask]),
     );
