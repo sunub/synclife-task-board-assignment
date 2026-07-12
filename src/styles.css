@@ -23,6 +23,10 @@ body {
     color: var(--text);
 }
 
+button {
+    cursor: pointer;
+}
+
 .app {
     padding: 24px;
     max-width: 1440px;
@@ -132,6 +136,8 @@ body {
     margin-bottom: 8px;
     line-height: 1.35;
     min-width: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .card-meta {
@@ -161,8 +167,16 @@ body {
 
 .board-toolbar {
     display: flex;
+    width: 100%;
+    justify-content: space-between;
     gap: 8px;
     margin: 16px 0;
+}
+
+.create-task-button {
+    background: #0052cc;
+    border-color: #0052cc;
+    color: #ffffff;
 }
 
 .board-toolbar button,
@@ -173,11 +187,9 @@ body {
 .task-panel textarea {
     border: 1px solid var(--border);
     border-radius: 6px;
-    color: var(--text);
     font: inherit;
 }
 
-.board-toolbar button,
 .task-panel button {
     background: #ffffff;
     cursor: pointer;
