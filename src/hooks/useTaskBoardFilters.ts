@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
+import { debounce } from "@/utils/debounce"
 import { selectVisibleTaskIdsByStatus } from "../lib/tasks"
 import type {
     TaskBoardModel,
@@ -15,16 +16,32 @@ export const SORT_OPTIONS: Record<TaskSortKey, TaskSortOptions> = {
 
 export function useTaskBoardFilters(boardModel: TaskBoardModel) {
     const [searchText, setSearchText] = useState("")
+    const [filterSearchText, setFilterSearchText] = useState("")
     const [sortBy, setSortBy] = useState<TaskSortKey>("updatedAt")
     const sortOptions = SORT_OPTIONS[sortBy]
+
+    const debouncedSetFilterSearchText = useMemo(
+        () =>
+            debounce((nextSearchText: string) => {
+                setFilterSearchText(nextSearchText)
+            }, 300),
+        [],
+    )
+
+    useEffect(() => {
+        debouncedSetFilterSearchText(searchText)
+        return () => {
+            debouncedSetFilterSearchText.cancel()
+        }
+    }, [searchText, debouncedSetFilterSearchText])
 
     const visibleTaskIdsByStatus = useMemo(
         () =>
             selectVisibleTaskIdsByStatus(boardModel, {
-                searchText,
+                searchText: filterSearchText,
                 sortOptions,
             }),
-        [boardModel, searchText, sortOptions],
+        [boardModel, filterSearchText, sortOptions],
     )
 
     return {
